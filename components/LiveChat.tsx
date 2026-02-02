@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
-import { Paperclip, X } from "lucide-react"; // Cần cài: npm install lucide-react
+import { Paperclip, X } from "lucide-react"; 
 
 export default function LiveChat() {
   const router = useRouter();
@@ -11,9 +11,20 @@ export default function LiveChat() {
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [uploading, setUploading] = useState(false); // Trạng thái upload ảnh
+  const [uploading, setUploading] = useState(false); 
 
-  // --- 1. KIỂM TRA ĐĂNG NHẬP ---
+  // --- MỚI: STATE CHO BONG BÓNG CHAT ---
+  const [currentBubbleMsg, setCurrentBubbleMsg] = useState(0);
+  const [isBubbleVisible, setIsBubbleVisible] = useState(true);
+  
+  const bubbleMessages = [
+    "💊 Tư vấn thuốc cắt liều: Ho, sổ mũi, đau cơ...",
+    "🏥 Cần tư vấn sức khỏe miễn phí?",
+    "🔎 Tìm thuốc đặc biệt không thấy trên web?",
+    "⚡ Giao hàng hỏa tốc trong 2h",
+  ];
+
+  // --- 1. KIỂM TRA ĐĂNG NHẬP (GIỮ NGUYÊN) ---
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -32,7 +43,23 @@ export default function LiveChat() {
     };
   }, []);
 
-  // --- 2. HÀM MỞ CHAT ---
+  // --- MỚI: HIỆU ỨNG CHẠY CHỮ BONG BÓNG ---
+  useEffect(() => {
+    // Chỉ chạy khi chat đang đóng
+    if (!isOpen) {
+        const interval = setInterval(() => {
+          setIsBubbleVisible(false); // Ẩn câu cũ
+          setTimeout(() => {
+            setCurrentBubbleMsg((prev) => (prev + 1) % bubbleMessages.length);
+            setIsBubbleVisible(true); // Hiện câu mới
+          }, 500); 
+        }, 4000); // Đổi câu mỗi 4 giây
+    
+        return () => clearInterval(interval);
+    }
+  }, [isOpen]);
+
+  // --- 2. HÀM MỞ CHAT (GIỮ NGUYÊN) ---
   const handleOpenChat = () => {
     if (!currentUser) {
       router.push("/login");
@@ -41,7 +68,7 @@ export default function LiveChat() {
     }
   };
 
-  // --- 3. TẢI TIN NHẮN & REALTIME ---
+  // --- 3. TẢI TIN NHẮN & REALTIME (GIỮ NGUYÊN) ---
   useEffect(() => {
     if (isOpen && currentUser) {
       const identifier = currentUser.phone || currentUser.email;
@@ -95,7 +122,7 @@ export default function LiveChat() {
     }, 100);
   };
 
-  // --- 4. XỬ LÝ UPLOAD ẢNH ---
+  // --- 4. XỬ LÝ UPLOAD ẢNH (GIỮ NGUYÊN) ---
   const handleUploadImage = async (file: File) => {
     if (!currentUser) return;
     setUploading(true);
@@ -112,7 +139,6 @@ export default function LiveChat() {
         .from("chat-uploads")
         .getPublicUrl(fileName);
 
-      // Gửi tin nhắn dạng ảnh
       await sendMessage("", urlData.publicUrl);
     } catch (error) {
       console.error("Upload lỗi:", error);
@@ -122,7 +148,6 @@ export default function LiveChat() {
     }
   };
 
-  // Xử lý Paste ảnh (Ctrl+V)
   const handlePaste = (e: React.ClipboardEvent) => {
     const items = e.clipboardData.items;
     for (const item of items) {
@@ -133,14 +158,13 @@ export default function LiveChat() {
     }
   };
 
-  // --- 5. HÀM GỬI TIN NHẮN CHUNG ---
+  // --- 5. HÀM GỬI TIN NHẮN CHUNG (GIỮ NGUYÊN) ---
   const sendMessage = async (textContent: string = "", imageUrl: string | null = null) => {
     if ((!textContent.trim() && !imageUrl) || !currentUser) return;
 
     const identifier = currentUser.phone || currentUser.email;
     const displayName = currentUser.user_metadata?.full_name || currentUser.email?.split("@")[0] || "Khách hàng";
 
-    // Optimistic UI
     const tempMessage = {
         id: Date.now(),
         content: textContent,
@@ -176,6 +200,8 @@ export default function LiveChat() {
 
   return (
     <div className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end gap-3 font-sans">
+      
+      {/* --- PHẦN CỬA SỔ CHAT (GIỮ NGUYÊN) --- */}
       {isOpen && currentUser && (
         <div
           className="w-[350px] bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col animate-fade-in-up"
@@ -214,7 +240,7 @@ export default function LiveChat() {
                 )}
                 <div className={`max-w-[85%] flex flex-col gap-1 ${msg.is_admin ? "items-start" : "items-end"}`}>
                   
-                  {/* --- HIỂN THỊ ẢNH --- */}
+                  {/* Ảnh */}
                   {msg.img && (
                     <img 
                       src={msg.img} 
@@ -224,7 +250,7 @@ export default function LiveChat() {
                     />
                   )}
 
-                  {/* --- HIỂN THỊ SẢN PHẨM (NẾU DƯỢC SĨ GỬI) --- */}
+                  {/* Sản phẩm */}
                   {msg.product_data && (
                     <div className="bg-white border border-blue-200 rounded-lg p-2 flex gap-2 items-center w-full shadow-sm cursor-pointer hover:bg-blue-50 transition" onClick={() => router.push(`/product/${msg.product_data.id}`)}>
                         <img src={msg.product_data.img && msg.product_data.img.startsWith('[') ? JSON.parse(msg.product_data.img)[0] : msg.product_data.img} className="w-12 h-12 object-cover rounded" />
@@ -235,7 +261,7 @@ export default function LiveChat() {
                     </div>
                   )}
 
-                  {/* --- HIỂN THỊ NỘI DUNG TEXT --- */}
+                  {/* Text */}
                   {msg.content && (
                     <div className={`p-3 text-sm rounded-2xl shadow-sm ${msg.is_admin ? "bg-white text-gray-800 rounded-bl-none border border-gray-200" : "bg-blue-600 text-white rounded-br-none"}`}>
                       {msg.content}
@@ -250,7 +276,6 @@ export default function LiveChat() {
 
           {/* Ô nhập liệu */}
           <form onSubmit={handleSendText} className="p-3 bg-white border-t border-gray-100 flex gap-2 items-center">
-            {/* Nút gửi ảnh */}
             <label className="cursor-pointer text-gray-400 hover:text-blue-600 p-2 rounded-full hover:bg-gray-100 transition">
                 <Paperclip size={20} />
                 <input 
@@ -267,23 +292,48 @@ export default function LiveChat() {
               className="flex-1 px-4 py-2 bg-gray-100 rounded-full text-sm outline-none focus:ring-1 focus:ring-blue-500 text-black transition"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              onPaste={handlePaste} // Hỗ trợ dán ảnh
+              onPaste={handlePaste}
             />
             <button type="submit" className="bg-blue-600 text-white w-10 h-10 rounded-full hover:bg-blue-700 flex items-center justify-center shadow-sm">➤</button>
           </form>
         </div>
       )}
 
+      {/* --- PHẦN NÚT CHAT THU NHỎ (CÓ BONG BÓNG MỚI) --- */}
       {!isOpen && (
-        <button onClick={handleOpenChat} className="group flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full shadow-lg hover:scale-105 transition-all duration-300 hover:bg-blue-700 relative z-50 ring-4 ring-white">
-          <div className="absolute right-full mr-4 bg-white text-gray-800 px-4 py-2 rounded-xl shadow-lg border border-gray-100 whitespace-nowrap hidden group-hover:block transition-all animate-fade-in">
-            <p className="text-sm font-bold text-blue-600">Chat với Dược sĩ</p>
-            <p className="text-xs text-gray-500">{currentUser ? "Bạn đang đăng nhập" : "Vui lòng đăng nhập để chat"}</p>
-            <div className="absolute top-1/2 -right-2 w-4 h-4 bg-white transform -translate-y-1/2 rotate-45 border-r border-t border-gray-100"></div>
-          </div>
-          <img src="https://cdn-icons-png.flaticon.com/512/3304/3304567.png" className="w-10 h-10 object-cover" alt="icon" />
-          <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></span>
-        </button>
+        <div className="relative flex flex-col items-end gap-2">
+            
+            {/* 🔥 BONG BÓNG CHAT CHẠY CHỮ (MỚI THÊM) */}
+            <div 
+                className={`bg-white text-gray-800 px-4 py-2 rounded-lg shadow-lg border border-blue-100 max-w-[250px] text-sm font-medium transition-all duration-500 transform origin-bottom-right relative mb-1 mr-1
+                ${isBubbleVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-90 translate-y-2"}
+                `}
+            >
+                {bubbleMessages[currentBubbleMsg]}
+                {/* Mũi tên trỏ xuống */}
+                <div className="absolute -bottom-1.5 right-6 w-3 h-3 bg-white transform rotate-45 border-r border-b border-blue-100"></div>
+                {/* Nút tắt bong bóng */}
+                <button 
+                    onClick={(e) => { e.currentTarget.parentElement?.remove() }}
+                    className="absolute -top-2 -left-2 bg-gray-200 text-gray-500 rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-500 hover:text-white shadow-sm"
+                >
+                    ✕
+                </button>
+            </div>
+
+            {/* Nút tròn xanh (Giữ nguyên) */}
+            <button onClick={handleOpenChat} className="group flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full shadow-lg hover:scale-105 transition-all duration-300 hover:bg-blue-700 relative z-50 ring-4 ring-white animate-bounce-slow">
+                {/* Tooltip cũ khi hover (Giữ nguyên) */}
+                <div className="absolute right-full mr-4 bg-white text-gray-800 px-4 py-2 rounded-xl shadow-lg border border-gray-100 whitespace-nowrap hidden group-hover:block transition-all animate-fade-in">
+                    <p className="text-sm font-bold text-blue-600">Chat với Dược sĩ</p>
+                    <p className="text-xs text-gray-500">{currentUser ? "Bạn đang đăng nhập" : "Vui lòng đăng nhập để chat"}</p>
+                    <div className="absolute top-1/2 -right-2 w-4 h-4 bg-white transform -translate-y-1/2 rotate-45 border-r border-t border-gray-100"></div>
+                </div>
+                
+                <img src="https://cdn-icons-png.flaticon.com/512/3304/3304567.png" className="w-10 h-10 object-cover" alt="icon" />
+                <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></span>
+            </button>
+        </div>
       )}
     </div>
   );

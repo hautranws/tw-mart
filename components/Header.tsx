@@ -201,6 +201,8 @@ export default function Header() {
         <div className="container mx-auto">
           {/* Sửa text-gray-700 thành text-white */}
           <ul className="flex justify-center gap-8 text-sm font-bold text-white px-4">
+            
+            {/* 1. RENDER CÁC MỤC MENU CŨ (TỪ CONSTANTS) */}
             {NAV_ITEMS.map((item) => (
               <li
                 key={item.id}
@@ -559,6 +561,14 @@ export default function Header() {
                 </div>
               </li>
             ))}
+
+            {/* 👇 2. ĐÃ THÊM: MỤC "HỆ THỐNG NHÀ THUỐC" (Nằm kế bên mục cuối cùng) */}
+            <li className="group py-4 cursor-pointer hover:text-yellow-300 flex items-center gap-1 static border-b-2 border-transparent hover:border-yellow-300 transition-all">
+               <Link href="/he-thong-nha-thuoc" className="uppercase tracking-wide">
+                  Hệ thống nhà thuốc
+               </Link>
+            </li>
+
           </ul>
         </div>
       </div>
@@ -587,6 +597,16 @@ export default function Header() {
                   {item.label}
                 </Link>
               ))}
+              
+              {/* Thêm link vào Mobile Menu luôn cho đồng bộ */}
+              <Link
+                  href="/he-thong-nha-thuoc"
+                  className="block px-6 py-3 hover:bg-gray-100 border-b"
+                  onClick={toggleMenu}
+                >
+                  HỆ THỐNG NHÀ THUỐC
+              </Link>
+
               <div className="mt-4 px-6">
                 {user ? (
                   <button

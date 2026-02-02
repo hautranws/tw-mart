@@ -233,13 +233,13 @@ export default function SearchBar() {
         </div>
       )}
 
-      {/* 3. TĂNG CỠ CHỮ GỢI Ý: text-xs -> text-sm, mt-2 -> mt-3 */}
-      <div className="flex items-center gap-4 mt-3 overflow-x-auto whitespace-nowrap text-sm text-white font-medium hide-scrollbar">
+      {/* 👇 ĐÃ SỬA: Đổi màu chữ thành text-black và hover thành màu xanh */}
+      <div className="flex items-center gap-4 mt-3 overflow-x-auto whitespace-nowrap text-sm text-black font-medium hide-scrollbar">
         {TOP_SEARCHES.map((tag, index) => (
           <button
             key={index}
             onClick={() => handleHistoryClick(tag)}
-            className="hover:underline hover:text-yellow-300 transition-colors opacity-90 hover:opacity-100"
+            className="hover:underline hover:text-blue-700 transition-colors opacity-90 hover:opacity-100"
           >
             {tag}
           </button>

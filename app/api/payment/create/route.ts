@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
-import nodemailer from "nodemailer"; 
+import nodemailer from "nodemailer";
 
 // Giữ nguyên các hàm import thanh toán của bạn
 import { createVNPayUrl } from "../../../../lib/payment/vnpay";
@@ -8,18 +8,27 @@ import { createMoMoUrl } from "../../../../lib/payment/momo";
 import { createPayOSLink } from "../../../../lib/payment/payos";
 
 // ==================================================================
-// ⚙️ CẤU HÌNH GỬI THÔNG BÁO (GIỮ NGUYÊN)
+// ⚙️ CẤU HÌNH GỬI THÔNG BÁO
 // ==================================================================
 
 const EMAIL_CONFIG = {
-  user: "email_cua_ban@gmail.com", 
-  pass: "xxxx xxxx xxxx xxxx",     
-  staffEmail: "email_nhan_vien@gmail.com", 
+  user: "email_cua_ban@gmail.com",
+  pass: "xxxx xxxx xxxx xxxx",
+  staffEmail: "email_nhan_vien@gmail.com",
 };
 
 const ZALO_CONFIG = {
-  accessToken: "DIEN_ZALO_ACCESS_TOKEN_VAO_DAY", 
-  oaId: "ID_ZALO_OA_CUA_BAN", 
+  // 👇 1. App ID (Lấy từ ảnh bạn gửi lúc nãy)
+  appId: "3298941731019507413", 
+  
+  // 👇 2. Secret Key (Vào trang Zalo Developer -> Cài đặt -> Copy Khóa bí mật)
+  secretKey: "29SHEYUvS88YNm6peVST", 
+
+  // 👇 3. Refresh Token (Lấy từ API Explorer, nhớ copy dòng Refresh Token chứ không phải Access Token)
+  refreshToken: "QqLTAgms3Y9ZIbSlhJ049cDCMYkkANn37rLQDeLHIJuPBtGrYI8lHWS72nIQVbXQ9rbN8gzcQtiaL3CpldGjLp5HDHk-RH1I4M8pEPnPQsPNIrPtxMfmB5XtILwBJ4rN4pLICgbC2beDCJ44mKzi3mjlN6EVTdyd0r9PBCzANsDwDMqjyGWrF7Wx6pNG729x7W4n8Ay8Q4rW1qr2r05A3c80LG7N7mn4QmSYCi053bHcA1CEyb4jPsfV4p_1TXzBJMiO5C9u86bGQmq2-nHN26WsJM2l26WmQN9AVDrhVoHtOdjf-qDb55fiIdw9NM4jBr99Uu9SQoOp8KDqf3n81Gu-OLI9G3jT6saPBu0RH4bB66KPtpvUOaCFVZ7fSKjiVdmL9B5O2dTuAYv-uGus9aV-IseyeI0490",
+
+  // 👇 4. ID Mẫu tin ZNS (Lấy sau khi Zalo duyệt mẫu)
+  templateId: "ID_MAU_TIN_ZNS_CUA_BAN", 
 };
 
 // ==================================================================
@@ -28,64 +37,80 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    // 👇 [SỬA] Nhận thêm userId từ Frontend gửi lên
-    const { items, customer, paymentMethod, couponCode, userId: clientUserId } = body;
+    const {
+      items,
+      customer,
+      paymentMethod,
+      couponCode,
+      userId: clientUserId,
+    } = body;
     const { name, phone, address, note } = customer;
 
     // --- BƯỚC 0: TÍNH TOÁN LẠI GIÁ & MÃ GIẢM GIÁ (GIỮ NGUYÊN) ---
-    const serverSubTotal = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
-    
+    const serverSubTotal = items.reduce(
+      (sum: number, item: any) => sum + item.price * item.quantity,
+      0,
+    );
+
     let discountAmount = 0;
     let finalAmount = serverSubTotal;
     let appliedCouponCode = null;
 
     if (couponCode) {
-        const { data: coupon } = await supabaseAdmin
+      const { data: coupon } = await supabaseAdmin
+        .from("coupons")
+        .select("*")
+        .eq("code", couponCode.toUpperCase().trim())
+        .single();
+
+      if (coupon) {
+        const now = new Date();
+        const expiry = coupon.expiry_date ? new Date(coupon.expiry_date) : null;
+        const isExpired = expiry && now > expiry;
+        const isLimitReached =
+          coupon.usage_limit > 0 && coupon.used_count >= coupon.usage_limit;
+        const isMinOrderMet = serverSubTotal >= (coupon.min_order_value || 0);
+
+        if (
+          coupon.is_active &&
+          !isExpired &&
+          !isLimitReached &&
+          isMinOrderMet
+        ) {
+          if (coupon.discount_type === "percent") {
+            discountAmount = (serverSubTotal * coupon.discount_value) / 100;
+          } else {
+            discountAmount = coupon.discount_value;
+          }
+
+          if (discountAmount > serverSubTotal) discountAmount = serverSubTotal;
+          finalAmount = serverSubTotal - discountAmount;
+          appliedCouponCode = coupon.code;
+
+          await supabaseAdmin
             .from("coupons")
-            .select("*")
-            .eq("code", couponCode.toUpperCase().trim())
-            .single();
-
-        if (coupon) {
-            const now = new Date();
-            const expiry = coupon.expiry_date ? new Date(coupon.expiry_date) : null;
-            const isExpired = expiry && now > expiry;
-            const isLimitReached = coupon.usage_limit > 0 && coupon.used_count >= coupon.usage_limit;
-            const isMinOrderMet = serverSubTotal >= (coupon.min_order_value || 0);
-
-            if (coupon.is_active && !isExpired && !isLimitReached && isMinOrderMet) {
-                if (coupon.discount_type === 'percent') {
-                    discountAmount = (serverSubTotal * coupon.discount_value) / 100;
-                } else {
-                    discountAmount = coupon.discount_value;
-                }
-                
-                if (discountAmount > serverSubTotal) discountAmount = serverSubTotal;
-                finalAmount = serverSubTotal - discountAmount;
-                appliedCouponCode = coupon.code;
-
-                await supabaseAdmin.from("coupons").update({ used_count: coupon.used_count + 1 }).eq("id", coupon.id);
-            }
+            .update({ used_count: coupon.used_count + 1 })
+            .eq("id", coupon.id);
         }
+      }
     }
 
-    // --- [SỬA] BƯỚC 1: XỬ LÝ USER (ƯU TIÊN USER ĐANG ĐĂNG NHẬP) ---
-    
-    let userId = clientUserId; // 1. Ưu tiên dùng ID từ frontend gửi lên
+    // --- BƯỚC 1: XỬ LÝ USER (GIỮ NGUYÊN) ---
+
+    let userId = clientUserId;
     let isNewUser = false;
 
-    // 2. Chỉ khi KHÔNG CÓ userId (Khách vãng lai) thì mới tạo User mới theo SĐT
     if (!userId) {
-        let formattedPhone = phone.trim();
-        if (formattedPhone.startsWith("0")) {
-          formattedPhone = "84" + formattedPhone.substring(1);
-        }
-        formattedPhone = formattedPhone.replace("+", "");
+      let formattedPhone = phone.trim();
+      if (formattedPhone.startsWith("0")) {
+        formattedPhone = "84" + formattedPhone.substring(1);
+      }
+      formattedPhone = formattedPhone.replace("+", "");
 
-        const randomPassword = Math.random().toString(36).slice(-8) + "Aa1@";
+      const randomPassword = Math.random().toString(36).slice(-8) + "Aa1@";
 
-        // Tạo user mới
-        const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      const { data: newUser, error: createError } =
+        await supabaseAdmin.auth.admin.createUser({
           phone: formattedPhone,
           password: randomPassword,
           email_confirm: true,
@@ -93,14 +118,12 @@ export async function POST(req: Request) {
           user_metadata: { full_name: name, address: address, phone: phone },
         });
 
-        if (!createError && newUser) {
-          userId = newUser.user.id;
-          isNewUser = true;
-        } else {
-           // [MỞ RỘNG] Nếu tạo lỗi (do SĐT đã tồn tại), cố gắng tìm user đó để gán đơn hàng (tránh đơn vô chủ)
-           // Lưu ý: Phần này tùy chọn, nếu muốn an toàn thì để userId = null đơn vẫn tạo được nhưng không gắn vào ai
-           console.log("User creation failed or exists:", createError?.message);
-        }
+      if (!createError && newUser) {
+        userId = newUser.user.id;
+        isNewUser = true;
+      } else {
+        console.log("User creation failed or exists:", createError?.message);
+      }
     }
 
     // --- BƯỚC 2: TẠO ĐƠN HÀNG VÀO DB (GIỮ NGUYÊN) ---
@@ -108,7 +131,7 @@ export async function POST(req: Request) {
       .from("orders")
       .insert([
         {
-          user_id: userId, // ID này giờ đây có thể là của khách cũ hoặc mới
+          user_id: userId,
           customer_name: name,
           phone: phone,
           address: address,
@@ -141,33 +164,37 @@ export async function POST(req: Request) {
     if (itemsError) throw itemsError;
 
     // ==================================================================
-    // 🔥 GỬI THÔNG BÁO (GIỮ NGUYÊN)
+    // 🔥 GỬI THÔNG BÁO (ĐÃ NÂNG CẤP TỰ ĐỘNG GIA HẠN TOKEN)
     // ==================================================================
     (async () => {
       try {
         const orderId = orderData.id;
-        const totalStr = finalAmount.toLocaleString("vi-VN"); 
-        
+        const totalStr = finalAmount.toLocaleString("vi-VN");
+
+        // 1. GỬI EMAIL (GIỮ NGUYÊN)
         if (EMAIL_CONFIG.user && EMAIL_CONFIG.pass) {
-            const transporter = nodemailer.createTransport({
-                service: "gmail",
-                auth: { user: EMAIL_CONFIG.user, pass: EMAIL_CONFIG.pass },
-            });
+          const transporter = nodemailer.createTransport({
+            service: "gmail",
+            auth: { user: EMAIL_CONFIG.user, pass: EMAIL_CONFIG.pass },
+          });
 
-            const itemsHtml = items.map((item: any) => 
-                `<li>${item.title || item.name} - SL: <b>${item.quantity}</b></li>`
-            ).join("");
+          const itemsHtml = items
+            .map(
+              (item: any) =>
+                `<li>${item.title || item.name} - SL: <b>${item.quantity}</b></li>`,
+            )
+            .join("");
 
-            let couponHtml = "";
-            if (discountAmount > 0) {
-                couponHtml = `<p style="color: green;"><b>🎁 Đã dùng mã:</b> ${appliedCouponCode} (Giảm ${discountAmount.toLocaleString()}đ)</p>`;
-            }
+          let couponHtml = "";
+          if (discountAmount > 0) {
+            couponHtml = `<p style="color: green;"><b>🎁 Đã dùng mã:</b> ${appliedCouponCode} (Giảm ${discountAmount.toLocaleString()}đ)</p>`;
+          }
 
-            const mailOptions = {
-                from: `"Hệ thống Đơn hàng" <${EMAIL_CONFIG.user}>`,
-                to: EMAIL_CONFIG.staffEmail,
-                subject: `🔔 Đơn mới #${orderId} - ${name} - ${totalStr}đ`,
-                html: `
+          const mailOptions = {
+            from: `"Hệ thống Đơn hàng" <${EMAIL_CONFIG.user}>`,
+            to: EMAIL_CONFIG.staffEmail,
+            subject: `🔔 Đơn mới #${orderId} - ${name} - ${totalStr}đ`,
+            html: `
                     <h2>CÓ ĐƠN HÀNG MỚI!</h2>
                     <p><b>Mã đơn:</b> #${orderId}</p>
                     <p><b>Khách hàng:</b> ${name}</p>
@@ -183,13 +210,78 @@ export async function POST(req: Request) {
                     <h3>TỔNG THANH TOÁN: <span style="color:red">${totalStr} đ</span></h3>
                     <p><i>Vui lòng gọi khách xác nhận ngay!</i></p>
                 `,
-            };
+          };
 
-            await transporter.sendMail(mailOptions);
+          await transporter.sendMail(mailOptions);
         }
 
-        if (ZALO_CONFIG.accessToken && phone) {
-             // Logic Zalo giữ nguyên
+        // 2. GỬI TIN NHẮN ZALO ZNS (LOGIC MỚI: DÙNG REFRESH TOKEN)
+        if (ZALO_CONFIG.refreshToken && phone) {
+            if (ZALO_CONFIG.templateId === "ID_MAU_TIN_ZNS_CUA_BAN") {
+                 console.log("⚠️ CHƯA GỬI ZALO: Bạn chưa điền Template ID.");
+            } else {
+                 console.log("🚀 Đang xử lý Zalo ZNS...");
+                 
+                 // --- BƯỚC A: LẤY ACCESS TOKEN MỚI TỪ REFRESH TOKEN ---
+                 // (Giúp hệ thống chạy được 3 tháng thay vì 1 ngày)
+                 let newAccessToken = "";
+                 try {
+                     const tokenRes = await fetch("https://oauth.zaloapp.com/v4/oa/access_token", {
+                         method: "POST",
+                         headers: {
+                             "Content-Type": "application/x-www-form-urlencoded",
+                             "secret_key": ZALO_CONFIG.secretKey
+                         },
+                         body: new URLSearchParams({
+                             refresh_token: ZALO_CONFIG.refreshToken,
+                             app_id: ZALO_CONFIG.appId,
+                             grant_type: "refresh_token"
+                         })
+                     });
+                     const tokenData = await tokenRes.json();
+                     if (tokenData.access_token) {
+                         newAccessToken = tokenData.access_token;
+                         console.log("✅ Đã làm mới Access Token thành công!");
+                     } else {
+                         console.error("❌ Lỗi lấy Token mới:", tokenData);
+                     }
+                 } catch (tokenErr) {
+                     console.error("❌ Lỗi kết nối Zalo Auth:", tokenErr);
+                 }
+
+                 // --- BƯỚC B: GỬI TIN NHẮN (NẾU CÓ TOKEN) ---
+                 if (newAccessToken) {
+                     let zaloPhone = phone.trim();
+                     if (zaloPhone.startsWith("0")) zaloPhone = "84" + zaloPhone.substring(1);
+                     zaloPhone = zaloPhone.replace(/\D/g, '');
+
+                     const znsRes = await fetch("https://business.openapi.zalo.me/message/template", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "access_token": newAccessToken // Dùng token vừa lấy
+                        },
+                        body: JSON.stringify({
+                            phone: zaloPhone,
+                            template_id: ZALO_CONFIG.templateId,
+                            template_data: {
+                                customer_name: name,
+                                order_code: String(orderId),
+                                total_amount: totalStr + " đ",
+                                status: "Đang xử lý"
+                            },
+                            tracking_id: String(orderId)
+                        })
+                     });
+
+                     const znsData = await znsRes.json();
+                     if (znsData.error !== 0) {
+                         console.error("❌ Lỗi gửi ZNS:", znsData);
+                     } else {
+                         console.log("✅ Gửi ZNS thành công!");
+                     }
+                 }
+            }
         }
 
       } catch (notifyError) {
@@ -197,8 +289,7 @@ export async function POST(req: Request) {
       }
     })();
 
-
-    // --- BƯỚC 3: TẠO LINK THANH TOÁN (GIỮ NGUYÊN) ---
+    // --- BƯỚC 3: TRẢ LINK THANH TOÁN (GIỮ NGUYÊN) ---
     let paymentUrl = "";
     const orderId = orderData.id;
     const orderInfo = `Thanh toan don #${orderId}`;
@@ -210,16 +301,24 @@ export async function POST(req: Request) {
       case "VNPAY":
       case "ATM":
       case "VISA":
-        paymentUrl = createVNPayUrl({ orderId, amount: amountToPay, orderInfo });
+        paymentUrl = createVNPayUrl({
+          orderId,
+          amount: amountToPay,
+          orderInfo,
+        });
         break;
       case "MOMO":
-        paymentUrl = await createMoMoUrl({ orderId, amount: amountToPay, orderInfo });
+        paymentUrl = await createMoMoUrl({
+          orderId,
+          amount: amountToPay,
+          orderInfo,
+        });
         break;
       case "BANK":
-        const payOSData = await createPayOSLink({ 
-            orderId: Number(orderId), 
-            amount: amountToPay, 
-            description: orderInfo 
+        const payOSData = await createPayOSLink({
+          orderId: Number(orderId),
+          amount: amountToPay,
+          description: orderInfo,
         });
         paymentUrl = payOSData.checkoutUrl;
         break;
@@ -228,13 +327,12 @@ export async function POST(req: Request) {
     }
 
     // --- BƯỚC 4: TRẢ KẾT QUẢ ---
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       orderId: orderId,
       isNewUser: isNewUser,
-      url: paymentUrl
+      url: paymentUrl,
     });
-
   } catch (error: any) {
     console.error("Payment API Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
