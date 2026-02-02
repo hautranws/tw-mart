@@ -7,6 +7,10 @@ import CategoryGrid from "@/components/CategoryGrid";
 import ProductCard from "@/components/ProductCard";
 import BestSellerSection from "@/components/BestSellerSection";
 
+// 👇 [QUAN TRỌNG] THÊM DÒNG NÀY ĐỂ SỬA LỖI BUILD
+// Nó giúp trang web luôn lấy dữ liệu mới nhất và không bị lỗi khi deploy
+export const dynamic = "force-dynamic";
+
 export default async function Home() {
   // 1. Lấy tất cả sản phẩm
   const { data: products, error } = await supabase
