@@ -77,13 +77,13 @@ export default function EditProductPage({
           if (data.sub_category) {
             // Kiểm tra nếu là chuỗi JSON mảng hoặc chuỗi phân tách bằng dấu phẩy
             if (data.sub_category.startsWith("[")) {
-               try {
-                  subs = JSON.parse(data.sub_category);
-               } catch {
-                  subs = [];
-               }
+              try {
+                subs = JSON.parse(data.sub_category);
+              } catch {
+                subs = [];
+              }
             } else {
-               subs = data.sub_category.split(",").map((s: string) => s.trim());
+              subs = data.sub_category.split(",").map((s: string) => s.trim());
             }
           }
 
@@ -140,7 +140,7 @@ export default function EditProductPage({
             });
             // Lọc trùng
             const uniqueItems = Array.from(
-              new Set(items.map((i) => i.title))
+              new Set(items.map((i) => i.title)),
             ).map((title) => items.find((i) => i.title === title));
             setSubOptions(uniqueItems);
           }
@@ -177,7 +177,7 @@ export default function EditProductPage({
         }
       });
       const uniqueItems = Array.from(new Set(items.map((i) => i.title))).map(
-        (title) => items.find((i) => i.title === title)
+        (title) => items.find((i) => i.title === title),
       );
       setSubOptions(uniqueItems);
     } else {
@@ -213,10 +213,11 @@ export default function EditProductPage({
     const newImages: string[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      // Kiểm tra kích thước ảnh (ví dụ giới hạn 2MB để tránh lỗi Supabase Payload quá lớn)
-      if (file.size > 2 * 1024 * 1024) {
-          alert(`Ảnh ${file.name} quá lớn (>2MB). Vui lòng chọn ảnh nhỏ hơn.`);
-          continue;
+
+      // 👇 ĐÃ SỬA Ở ĐÂY: Nâng giới hạn từ 2MB lên 10MB
+      if (file.size > 10 * 1024 * 1024) {
+        alert(`Ảnh ${file.name} quá lớn (>10MB). Vui lòng chọn ảnh nhỏ hơn.`);
+        continue;
       }
 
       const base64 = await new Promise<string>((resolve) => {
@@ -238,14 +239,14 @@ export default function EditProductPage({
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
+
     try {
       const resolvedParams = await params;
       const id = resolvedParams.id;
 
       // Chuyển mảng sub_category thành chuỗi để lưu vào DB (nếu DB lưu text)
       const subCategoryString = formData.sub_category.join(", ");
-      
+
       // Chuyển mảng ảnh thành chuỗi JSON
       const imgJsonString = JSON.stringify(images);
 
@@ -276,7 +277,9 @@ export default function EditProductPage({
   };
 
   if (fetching)
-    return <div className="p-10 text-center text-gray-500">Đang tải dữ liệu...</div>;
+    return (
+      <div className="p-10 text-center text-gray-500">Đang tải dữ liệu...</div>
+    );
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
@@ -415,7 +418,9 @@ export default function EditProductPage({
                   ))
                 ) : (
                   <div className="col-span-3 text-center text-gray-500 text-sm py-4">
-                    {formData.category ? "Không có mục con" : "Vui lòng chọn danh mục lớn trước"}
+                    {formData.category
+                      ? "Không có mục con"
+                      : "Vui lòng chọn danh mục lớn trước"}
                   </div>
                 )}
               </div>
@@ -425,7 +430,9 @@ export default function EditProductPage({
           {/* Giá cả */}
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-bold mb-1">Giá bán (VNĐ)</label>
+              <label className="block text-sm font-bold mb-1">
+                Giá bán (VNĐ)
+              </label>
               <input
                 type="number"
                 className="w-full p-3 border rounded-lg"
@@ -437,7 +444,9 @@ export default function EditProductPage({
               />
             </div>
             <div>
-              <label className="block text-sm font-bold mb-1 text-gray-500">Giá cũ</label>
+              <label className="block text-sm font-bold mb-1 text-gray-500">
+                Giá cũ
+              </label>
               <input
                 type="number"
                 className="w-full p-3 border rounded-lg"
@@ -448,7 +457,9 @@ export default function EditProductPage({
               />
             </div>
             <div>
-              <label className="block text-sm font-bold mb-1">Đơn vị (Hộp/Vỉ)</label>
+              <label className="block text-sm font-bold mb-1">
+                Đơn vị (Hộp/Vỉ)
+              </label>
               <input
                 type="text"
                 className="w-full p-3 border rounded-lg"
@@ -579,7 +590,9 @@ export default function EditProductPage({
 
           {/* Mô tả */}
           <div>
-            <label className="block text-sm font-bold mb-1">Mô tả sản phẩm</label>
+            <label className="block text-sm font-bold mb-1">
+              Mô tả sản phẩm
+            </label>
             <textarea
               className="w-full p-3 border rounded-lg h-32"
               value={formData.description}
