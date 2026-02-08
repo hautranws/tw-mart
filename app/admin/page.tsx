@@ -28,6 +28,9 @@ export default function AdminDashboard() {
   const [adminPassword, setAdminPassword] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
 
+  // --- [CODE MỚI] State cho phần nhập địa chỉ cửa hàng ---
+  const [quickAddress, setQuickAddress] = useState("");
+
   useEffect(() => {
     checkAuthAndFetchData();
   }, []);
@@ -89,6 +92,20 @@ export default function AdminDashboard() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.reload();
+  };
+
+  // --- [CODE MỚI] Hàm xử lý khi bấm nút Thêm Cửa Hàng ---
+  const handleQuickAddStore = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickAddress.trim()) {
+      alert("Vui lòng nhập địa chỉ trước khi thêm!");
+      return;
+    }
+    // Chuyển hướng sang trang add stores kèm theo query address
+    // Bạn hãy đảm bảo đường dẫn '/admin/stores/add' là chính xác với file bạn tạo
+    router.push(
+      `/admin/stores/add?address=${encodeURIComponent(quickAddress)}`,
+    );
   };
 
   // --- GIAO DIỆN LOGIN ---
@@ -201,7 +218,6 @@ export default function AdminDashboard() {
           </h1>
 
           {/* --- DANH SÁCH CHỨC NĂNG (GRID 5 CỘT) --- */}
-          {/* Giữ nguyên 5 cột để nút thứ 6 tự động rớt xuống dòng dưới ô số 1 */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
             {/* 1. Thêm SP Mới */}
             <Link
@@ -283,7 +299,7 @@ export default function AdminDashboard() {
               </p>
             </Link>
 
-            {/* 6. [MỚI] Chat Khách Hàng (Sẽ tự động xuống dòng, nằm dưới ô số 1) */}
+            {/* 6. Chat Khách Hàng */}
             <Link
               href="/admin/chat"
               className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-md border-2 border-transparent hover:border-indigo-600 hover:shadow-xl transition cursor-pointer group"
@@ -298,6 +314,31 @@ export default function AdminDashboard() {
                 Hỗ trợ trực tuyến
               </p>
             </Link>
+          </div>
+
+          {/* --- [CODE MỚI] SECTION NHẬP ĐỊA CHỈ & THÊM STORE --- */}
+          <div className="mt-8 bg-white p-6 rounded-2xl shadow-md border border-gray-100">
+            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+              📍 Thêm Cửa Hàng / Chi Nhánh Mới
+            </h3>
+            <form
+              onSubmit={handleQuickAddStore}
+              className="flex flex-col md:flex-row gap-4"
+            >
+              <input
+                type="text"
+                placeholder="Nhập địa chỉ cửa hàng cần thêm..."
+                className="flex-1 p-3 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                value={quickAddress}
+                onChange={(e) => setQuickAddress(e.target.value)}
+              />
+              <button
+                type="submit"
+                className="bg-red-700 text-white font-bold px-6 py-3 rounded hover:bg-red-800 transition whitespace-nowrap shadow-md flex items-center justify-center gap-2"
+              >
+                <span>🚀</span> Chuyển qua trang Add Stores
+              </button>
+            </form>
           </div>
         </div>
 

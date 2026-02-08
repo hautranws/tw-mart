@@ -12,44 +12,9 @@ import {
   Navigation,
   Clock,
 } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 
-// ✅ CẬP NHẬT DỮ LIỆU THẬT CỦA BẠN (Đã có tọa độ Lat/Lng chính xác)
-const STORES = [
-  {
-    id: 1,
-    name: "Nhà thuốc Thiên Hậu - Tây Hòa",
-    address: "130 Tây Hòa, Phước Long A, TP. Thủ Đức, TP.HCM",
-    phone: "0988 991 837",
-    province: "TP.HCM",
-    lat: 10.826883, // Tọa độ khu vực Tây Hòa
-    lng: 106.770929,
-    status: "Đang mở cửa",
-    hours: "06:00 - 22:00",
-  },
-  {
-    id: 2,
-    name: "Nhà thuốc Thiên Hậu - Lê Văn Chí",
-    address: "217 Lê Văn Chí, Linh Trung, TP. Thủ Đức, TP.HCM",
-    phone: "0988 991 837",
-    province: "TP.HCM",
-    lat: 10.860123, // Tọa độ khu vực Lê Văn Chí
-    lng: 106.772345,
-    status: "Đang mở cửa",
-    hours: "06:00 - 22:00",
-  },
-  {
-    id: 3,
-    name: "Nhà thuốc Thiên Hậu - Đường 16",
-    address: "2A Đường 16, Linh Trung, TP. Thủ Đức, TP.HCM",
-    phone: "0988 991 837",
-    province: "TP.HCM",
-    lat: 10.852111, // Tọa độ khu vực Đường 16
-    lng: 106.765444,
-    status: "Đang mở cửa",
-    hours: "06:00 - 22:00",
-  },
-];
-
+// GIỮ NGUYÊN PHẦN SERVICES (Tĩnh)
 const SERVICES = [
   {
     icon: <ShieldCheck className="w-8 h-8 text-blue-600" />,
@@ -79,18 +44,48 @@ export default function StoreSystemPage() {
   const [activeTab, setActiveTab] = useState("search");
   const [showLocationPopup, setShowLocationPopup] = useState(false);
 
-  const [displayStores, setDisplayStores] = useState(STORES);
-
-  // State lưu nhà thuốc đang được chọn để hiển thị chi tiết
+  // --- [THAY ĐỔI] Dùng State thay vì Const tĩnh ---
+  const [allStores, setAllStores] = useState<any[]>([]); // Dữ liệu gốc từ DB
+  const [displayStores, setDisplayStores] = useState<any[]>([]); // Dữ liệu đang hiển thị
   const [selectedStore, setSelectedStore] = useState<any>(null);
 
-  // Hàm tính khoảng cách (Haversine Formula)
-  const calculateDistance = (
-    lat1: number,
-    lon1: number,
-    lat2: number,
-    lon2: number,
-  ) => {
+  // 1. FETCH DATA TỪ SUPABASE
+  useEffect(() => {
+    const fetchStores = async () => {
+      const { data, error } = await supabase
+        .from('stores')
+        .select('*')
+        .eq('is_active', true);
+      
+      if (data) {
+        setAllStores(data);
+        setDisplayStores(data);
+      }
+    };
+    fetchStores();
+  }, []);
+
+  // 2. LOGIC LỌC TÌM KIẾM (Đã cập nhật dùng allStores)
+  useEffect(() => {
+    if (activeTab === "search") {
+      const filtered = allStores.filter((store) => {
+        const matchName =
+          store.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          store.name.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        // Logic lọc tỉnh: Nếu chọn HCM thì lọc theo city_code 79 hoặc tên tỉnh
+        const matchProvince =
+          selectedProvince === "Tất cả" || 
+          (selectedProvince === "TP.HCM" && (store.city_code === "79" || store.address.includes("Hồ Chí Minh") || store.address.includes("HCM")));
+        
+        return matchName && matchProvince;
+      });
+      setDisplayStores(filtered);
+    }
+  }, [searchTerm, selectedProvince, activeTab, allStores]);
+
+  // 3. LOGIC TÍNH KHOẢNG CÁCH
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
@@ -104,21 +99,6 @@ export default function StoreSystemPage() {
     return R * c;
   };
 
-  useEffect(() => {
-    if (activeTab === "search") {
-      const filtered = STORES.filter((store) => {
-        const matchName =
-          store.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          store.name.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchProvince =
-          selectedProvince === "Tất cả" || store.province === selectedProvince;
-        return matchName && matchProvince;
-      });
-      const cleanStores = filtered.map(({ ...rest }) => rest);
-      setDisplayStores(cleanStores as any);
-    }
-  }, [searchTerm, selectedProvince, activeTab]);
-
   const handleNearMeClick = () => {
     setActiveTab("near_me");
     if (!navigator.geolocation) {
@@ -128,18 +108,14 @@ export default function StoreSystemPage() {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
-        const storesWithDistance = STORES.map((store) => {
-          const dist = calculateDistance(
-            latitude,
-            longitude,
-            store.lat,
-            store.lng,
-          );
+        const storesWithDistance = allStores.map((store) => {
+          // Nếu DB chưa có lat/lng thì cho khoảng cách cực lớn
+          if (!store.lat || !store.lng) return { ...store, distance: 99999 };
+          
+          const dist = calculateDistance(latitude, longitude, store.lat, store.lng);
           return { ...store, distance: dist };
         });
-        const sortedStores = storesWithDistance.sort(
-          (a, b) => a.distance - b.distance,
-        );
+        const sortedStores = storesWithDistance.sort((a, b) => a.distance - b.distance);
         setDisplayStores(sortedStores);
 
         if (sortedStores.length > 0) setSelectedStore(sortedStores[0]);
@@ -148,7 +124,7 @@ export default function StoreSystemPage() {
         console.error("Lỗi định vị:", error);
         setShowLocationPopup(true);
         setActiveTab("search");
-      },
+      }
     );
   };
 
@@ -239,7 +215,7 @@ export default function StoreSystemPage() {
                 <div
                   className={`mt-1 w-4 h-4 rounded-full border flex items-center justify-center shrink-0 
                     ${selectedStore?.id === store.id ? "border-blue-600" : "border-gray-400"}
-                 `}
+                  `}
                 >
                   {selectedStore?.id === store.id && (
                     <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
@@ -253,7 +229,7 @@ export default function StoreSystemPage() {
                     >
                       {store.name}
                     </h4>
-                    {store.distance && (
+                    {store.distance && store.distance < 9999 && (
                       <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap">
                         {store.distance < 1
                           ? `${(store.distance * 1000).toFixed(0)}m`
@@ -286,7 +262,7 @@ export default function StoreSystemPage() {
               </h2>
 
               <div className="flex flex-col md:flex-row gap-6">
-                {/* Bản đồ */}
+                {/* Bản đồ (Tự động dùng Map Link hoặc Tạo từ Địa chỉ) */}
                 <div className="w-full md:w-1/2 h-64 md:h-auto rounded-xl overflow-hidden shadow-sm border border-gray-200 bg-gray-100 relative">
                   <iframe
                     width="100%"
@@ -294,11 +270,12 @@ export default function StoreSystemPage() {
                     style={{ border: 0 }}
                     loading="lazy"
                     allowFullScreen
-                    src={`https://maps.google.com/maps?q=${selectedStore.lat},${selectedStore.lng}&hl=vi&z=16&output=embed`}
+                    src={selectedStore.map_url || `https://maps.google.com/maps?q=${encodeURIComponent(selectedStore.address)}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
                   ></iframe>
                   <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${selectedStore.lat},${selectedStore.lng}`}
+                    href={selectedStore.map_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedStore.address)}`}
                     target="_blank"
+                    rel="noreferrer"
                     className="absolute bottom-2 left-2 bg-white px-3 py-1 text-xs font-bold text-blue-600 rounded shadow hover:bg-blue-50"
                   >
                     Xem bản đồ lớn hơn
@@ -307,6 +284,13 @@ export default function StoreSystemPage() {
 
                 {/* Thông tin chi tiết */}
                 <div className="w-full md:w-1/2 flex flex-col gap-4">
+                  {/* Nếu có ảnh thì hiện ảnh nhỏ ở đây */}
+                  {selectedStore.image_url && (
+                      <div className="h-32 w-full rounded-lg overflow-hidden border">
+                          <img src={selectedStore.image_url} className="w-full h-full object-cover" alt="Store Image" />
+                      </div>
+                  )}
+
                   <div>
                     <p className="font-bold text-gray-700 mb-1">Địa chỉ:</p>
                     <p className="text-sm text-gray-600">
@@ -317,14 +301,14 @@ export default function StoreSystemPage() {
                   <div>
                     <p className="font-bold text-blue-600 mb-1 flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                      {selectedStore.status}{" "}
+                      {selectedStore.status || "Đang mở cửa"}{" "}
                       <span className="text-gray-400 font-normal">
                         • Mở cửa lúc 06:00
                       </span>
                     </p>
                     <p className="text-sm text-gray-600 flex items-center gap-2">
                       <Clock size={16} className="text-gray-400" />{" "}
-                      {selectedStore.hours}
+                      {selectedStore.hours || "06:00 - 22:00"}
                     </p>
                   </div>
 
@@ -337,11 +321,11 @@ export default function StoreSystemPage() {
 
                   <div className="mt-auto flex gap-3 pt-4">
                     <a
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${selectedStore.lat},${selectedStore.lng}`}
+                      href={selectedStore.map_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedStore.address)}`}
                       target="_blank"
                       className="flex-1 bg-blue-700 hover:bg-blue-800 text-white font-bold py-2 rounded-full text-center transition flex items-center justify-center gap-2"
                     >
-                      <MapPin size={18} /> Xem chỉ đường
+                      <MapPin size={18} /> Chỉ đường
                     </a>
                     <a
                       href={`tel:${selectedStore.phone}`}

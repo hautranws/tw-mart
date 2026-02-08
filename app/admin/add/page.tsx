@@ -25,7 +25,7 @@ export default function AddProductPage() {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false); // Trạng thái đang upload ảnh
 
-  // --- MỚI: State quản lý MẢNG file ảnh (Thay vì 1 file như trước) ---
+  // --- MỚI: State quản lý MẢNG file ảnh ---
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
 
@@ -52,13 +52,12 @@ export default function AddProductPage() {
     is_prescription: false, // Thuốc kê đơn (Rx)
     indications: "",        // Chỉ định
     contraindications: "",  // Chống chỉ định
-    // Đã xóa dosage (Liều dùng)
   });
 
   // Xử lý khi chọn Danh mục cha -> Tự động load danh mục con
   const [subOptions, setSubOptions] = useState<any[]>([]);
 
-  // --- MỚI: Hàm xử lý khi chọn NHIỀU file từ máy tính ---
+  // --- HÀM XỬ LÝ CHỌN FILE TỪ MÁY TÍNH ---
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
@@ -77,7 +76,7 @@ export default function AddProductPage() {
     }
   };
 
-  // --- [ĐÃ SỬA] LOGIC LẤY DANH MỤC CON THÔNG MINH HƠN ---
+  // --- LOGIC LẤY DANH MỤC CON THÔNG MINH HƠN ---
   const handleCategoryChange = (e: any) => {
     const selectedCat = e.target.value;
     setFormData({ ...formData, category: selectedCat, sub_category: [] });
@@ -139,19 +138,23 @@ export default function AddProductPage() {
         const uploadedUrls: string[] = [];
 
         for (const file of selectedFiles) {
-          const fileName = `${Date.now()}_${Math.random()
-            .toString(36)
-            .substring(7)}_${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
+          // ⚠️ CHỈNH SỬA Ở ĐÂY: Upload vào bucket 'products' thay vì Base64
+          // Tạo tên file duy nhất để tránh trùng
+          const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}_${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
 
+          // Upload lên Storage
           const { error: uploadError } = await supabase.storage
-            .from("product")
+            .from("products") // Đã sửa thành 'products' (có 's') cho khớp với bucket bạn tạo
             .upload(fileName, file);
 
-          if (uploadError)
-            throw new Error("Lỗi upload: " + uploadError.message);
+          if (uploadError) {
+             console.error("Lỗi upload:", uploadError);
+             throw new Error("Lỗi upload ảnh (Hãy chắc chắn bạn đã tạo bucket 'products' và đặt Public): " + uploadError.message);
+          }
 
+          // Lấy Public URL
           const { data: urlData } = supabase.storage
-            .from("product")
+            .from("products")
             .getPublicUrl(fileName);
 
           uploadedUrls.push(urlData.publicUrl);
@@ -160,6 +163,7 @@ export default function AddProductPage() {
         finalImageString = JSON.stringify(uploadedUrls);
         setUploading(false);
       } else if (formData.img) {
+        // Nếu người dùng dán link ảnh trực tiếp
         if (formData.img.startsWith("[")) {
           finalImageString = formData.img;
         } else {
@@ -173,7 +177,7 @@ export default function AddProductPage() {
         title: formData.title,
         price: formData.price,
         old_price: formData.old_price,
-        img: finalImageString, 
+        img: finalImageString, // Giờ đây là chuỗi JSON chứa các đường link ngắn gọn
         category: formData.category,
         sub_category: subCategoryString,
         brand: formData.brand,
@@ -188,11 +192,9 @@ export default function AddProductPage() {
         ingredients: formData.ingredients,
         expiry: formData.expiry,
         // --- [SỬA] CHỈ GỬI DỮ LIỆU THUỐC NẾU LÀ THUỐC ---
-        // Nếu không phải thuốc, gửi null hoặc false để tránh rác data
         is_prescription: formData.category === "Thuốc" ? formData.is_prescription : false,
         indications: formData.category === "Thuốc" ? formData.indications : null,
         contraindications: formData.category === "Thuốc" ? formData.contraindications : null,
-        // Đã xóa dosage khỏi payload
       };
 
       const { error } = await supabase.from("products").insert([payload]);
@@ -218,11 +220,9 @@ export default function AddProductPage() {
         manufacturer: "",
         ingredients: "",
         expiry: "",
-        // Reset trường mới
         is_prescription: false,
         indications: "",
         contraindications: "",
-        // dosage đã xóa
       });
       setSelectedFiles([]);
       setPreviewUrls([]);
@@ -582,7 +582,7 @@ export default function AddProductPage() {
             </div>
           </div>
 
-          {/* --- [SỬA] KHU VỰC THÔNG TIN CHUYÊN SÂU (CHỈ HIỆN KHI LÀ "THUỐC") --- */}
+          {/* --- KHU VỰC THÔNG TIN CHUYÊN SÂU (CHỈ HIỆN KHI LÀ "THUỐC") --- */}
           {formData.category === "Thuốc" && (
             <div className="bg-red-50 p-6 rounded-lg border border-red-200 mt-6 animate-fade-in">
                 <h3 className="text-lg font-bold text-red-800 mb-4 border-b border-red-200 pb-2 flex items-center justify-between">
@@ -618,11 +618,9 @@ export default function AddProductPage() {
                             onChange={(e) => setFormData({...formData, contraindications: e.target.value})}
                         />
                     </div>
-                    {/* Đã xóa ô nhập Liều dùng (Dosage) tại đây theo yêu cầu */}
                 </div>
             </div>
           )}
-          {/* ------------------------------------------------------------- */}
 
           {/* Hàng 6: Mô tả */}
           <div>

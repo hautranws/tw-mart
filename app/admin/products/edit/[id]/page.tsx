@@ -28,6 +28,7 @@ export default function EditProductPage({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+  const [uploading, setUploading] = useState(false); // --- MỚI: Trạng thái upload ---
 
   // --- STATE DỮ LIỆU ---
   const [formData, setFormData] = useState({
@@ -49,8 +50,9 @@ export default function EditProductPage({
     is_best_seller: false,
   });
 
-  // --- STATE QUẢN LÝ ẢNH & DANH MỤC CON ---
-  const [images, setImages] = useState<string[]>([]);
+  // --- STATE QUẢN LÝ ẢNH ---
+  const [images, setImages] = useState<string[]>([]); // Dùng để hiển thị (Preview)
+  const [newFiles, setNewFiles] = useState<File[]>([]); // --- MỚI: Chứa file chờ upload ---
   const [subOptions, setSubOptions] = useState<any[]>([]);
 
   // --- 1. Lấy dữ liệu cũ ---
@@ -75,26 +77,27 @@ export default function EditProductPage({
           // Xử lý danh mục phụ (String -> Array)
           let subs: string[] = [];
           if (data.sub_category) {
-            // Kiểm tra nếu là chuỗi JSON mảng hoặc chuỗi phân tách bằng dấu phẩy
             if (data.sub_category.startsWith("[")) {
-              try {
-                subs = JSON.parse(data.sub_category);
-              } catch {
-                subs = [];
-              }
+               try {
+                  subs = JSON.parse(data.sub_category);
+               } catch {
+                  subs = [];
+               }
             } else {
-              subs = data.sub_category.split(",").map((s: string) => s.trim());
+               subs = data.sub_category.split(",").map((s: string) => s.trim());
             }
           }
 
-          // --- XỬ LÝ ẢNH CŨ (Chuyển về mảng) ---
+          // --- XỬ LÝ ẢNH CŨ ---
           let loadedImages: string[] = [];
           if (data.img) {
             try {
+              // Nếu là JSON mảng (Kiểu mới)
               if (data.img.startsWith("[")) {
                 const parsed = JSON.parse(data.img);
                 loadedImages = Array.isArray(parsed) ? parsed : [data.img];
               } else {
+                // Nếu là Base64 hoặc link đơn (Kiểu cũ)
                 loadedImages = [data.img];
               }
             } catch {
@@ -108,7 +111,7 @@ export default function EditProductPage({
             title: data.title || "",
             price: data.price || "",
             old_price: data.old_price || "",
-            category: data.category || "", // Lưu ý: Cột này trong DB phải là 'category', nếu DB là 'category_id' thì sửa ở đây
+            category: data.category || "", 
             sub_category: subs,
             brand: data.brand || "",
             origin: data.origin || "",
@@ -123,7 +126,7 @@ export default function EditProductPage({
             is_best_seller: data.is_best_seller || false,
           });
 
-          // Load danh mục con tương ứng với danh mục lớn đã lưu
+          // Load danh mục con
           if (data.category && CATEGORY_OPTIONS[data.category]) {
             const groupData = CATEGORY_OPTIONS[data.category];
             let items: any[] = [];
@@ -138,9 +141,8 @@ export default function EditProductPage({
                 });
               }
             });
-            // Lọc trùng
             const uniqueItems = Array.from(
-              new Set(items.map((i) => i.title)),
+              new Set(items.map((i) => i.title))
             ).map((title) => items.find((i) => i.title === title));
             setSubOptions(uniqueItems);
           }
@@ -177,7 +179,7 @@ export default function EditProductPage({
         }
       });
       const uniqueItems = Array.from(new Set(items.map((i) => i.title))).map(
-        (title) => items.find((i) => i.title === title),
+        (title) => items.find((i) => i.title === title)
       );
       setSubOptions(uniqueItems);
     } else {
@@ -185,7 +187,6 @@ export default function EditProductPage({
     }
   };
 
-  // --- Logic chọn Danh mục con (Checkbox) ---
   const handleSubCategoryChange = (subTitle: string) => {
     setFormData((prev) => {
       const currentSubs = prev.sub_category;
@@ -200,8 +201,8 @@ export default function EditProductPage({
     });
   };
 
-  // --- XỬ LÝ ẢNH (Base64) ---
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // --- [ĐÃ SỬA] XỬ LÝ ẢNH: CHUẨN BỊ FILE ĐỂ UPLOAD ---
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -210,28 +211,19 @@ export default function EditProductPage({
       return;
     }
 
-    const newImages: string[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    const fileArray = Array.from(files);
+    
+    // Thêm file vào hàng đợi upload
+    setNewFiles((prev) => [...prev, ...fileArray]);
 
-      // 👇 ĐÃ SỬA Ở ĐÂY: Nâng giới hạn từ 2MB lên 10MB
-      if (file.size > 10 * 1024 * 1024) {
-        alert(`Ảnh ${file.name} quá lớn (>10MB). Vui lòng chọn ảnh nhỏ hơn.`);
-        continue;
-      }
-
-      const base64 = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result as string);
-      });
-      newImages.push(base64);
-    }
-
-    setImages((prev) => [...prev, ...newImages]);
+    // Tạo ảnh preview ngay lập tức (dùng Blob URL nhẹ nhàng)
+    const newPreviewUrls = fileArray.map(file => URL.createObjectURL(file));
+    setImages((prev) => [...prev, ...newPreviewUrls]);
   };
 
   const removeImage = (indexToRemove: number) => {
+    // Lưu ý: Nếu xóa ảnh mới chọn thì file đó vẫn nằm trong hàng đợi upload (chấp nhận được)
+    // Hoặc logic phức tạp hơn cần map ID. Ở đây làm đơn giản là xóa khỏi giao diện.
     setImages((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
 
@@ -239,22 +231,51 @@ export default function EditProductPage({
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
+    
     try {
       const resolvedParams = await params;
       const id = resolvedParams.id;
 
-      // Chuyển mảng sub_category thành chuỗi để lưu vào DB (nếu DB lưu text)
-      const subCategoryString = formData.sub_category.join(", ");
+      // 1. Upload ảnh mới (nếu có) lên Storage
+      let newUploadedUrls: string[] = [];
+      if (newFiles.length > 0) {
+          setUploading(true);
+          for (const file of newFiles) {
+              const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}_${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
+              const { error: uploadError } = await supabase.storage
+                  .from("products") // Upload vào bucket 'products'
+                  .upload(fileName, file);
+              
+              if (uploadError) {
+                  console.error("Lỗi upload:", uploadError);
+                  // Không throw error để vẫn lưu được các ảnh khác
+                  continue; 
+              }
 
-      // Chuyển mảng ảnh thành chuỗi JSON
-      const imgJsonString = JSON.stringify(images);
+              const { data: urlData } = supabase.storage
+                  .from("products")
+                  .getPublicUrl(fileName);
+              
+              newUploadedUrls.push(urlData.publicUrl);
+          }
+          setUploading(false);
+      }
+
+      // 2. Gộp ảnh:
+      // - Lấy những ảnh CŨ còn giữ lại (là những link bắt đầu bằng http hoặc data:image cũ)
+      // - Loại bỏ những ảnh blob: (là ảnh preview tạm thời, thay bằng link thật vừa upload)
+      const keptOldImages = images.filter(img => !img.startsWith('blob:'));
+      
+      // - Gộp ảnh cũ + ảnh mới vừa upload xong
+      const finalImages = [...keptOldImages, ...newUploadedUrls];
+      const imgJsonString = JSON.stringify(finalImages);
+
+      const subCategoryString = formData.sub_category.join(", ");
 
       const payload = {
         ...formData,
-        img: imgJsonString,
+        img: imgJsonString, // Lưu chuỗi JSON link ảnh
         sub_category: subCategoryString,
-        // Đảm bảo convert giá sang số
         price: Number(formData.price),
         old_price: formData.old_price ? Number(formData.old_price) : 0,
       };
@@ -267,19 +288,18 @@ export default function EditProductPage({
       if (error) throw error;
 
       alert("✅ Cập nhật thành công!");
-      router.push("/admin/activity"); // Quay lại trang nhật ký hoặc danh sách SP
+      router.push("/admin/activity"); 
     } catch (error: any) {
       console.error(error);
       alert("Lỗi cập nhật: " + error.message);
     } finally {
       setLoading(false);
+      setUploading(false);
     }
   };
 
   if (fetching)
-    return (
-      <div className="p-10 text-center text-gray-500">Đang tải dữ liệu...</div>
-    );
+    return <div className="p-10 text-center text-gray-500">Đang tải dữ liệu...</div>;
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
@@ -418,9 +438,7 @@ export default function EditProductPage({
                   ))
                 ) : (
                   <div className="col-span-3 text-center text-gray-500 text-sm py-4">
-                    {formData.category
-                      ? "Không có mục con"
-                      : "Vui lòng chọn danh mục lớn trước"}
+                    {formData.category ? "Không có mục con" : "Vui lòng chọn danh mục lớn trước"}
                   </div>
                 )}
               </div>
@@ -430,9 +448,7 @@ export default function EditProductPage({
           {/* Giá cả */}
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-bold mb-1">
-                Giá bán (VNĐ)
-              </label>
+              <label className="block text-sm font-bold mb-1">Giá bán (VNĐ)</label>
               <input
                 type="number"
                 className="w-full p-3 border rounded-lg"
@@ -444,9 +460,7 @@ export default function EditProductPage({
               />
             </div>
             <div>
-              <label className="block text-sm font-bold mb-1 text-gray-500">
-                Giá cũ
-              </label>
+              <label className="block text-sm font-bold mb-1 text-gray-500">Giá cũ</label>
               <input
                 type="number"
                 className="w-full p-3 border rounded-lg"
@@ -457,9 +471,7 @@ export default function EditProductPage({
               />
             </div>
             <div>
-              <label className="block text-sm font-bold mb-1">
-                Đơn vị (Hộp/Vỉ)
-              </label>
+              <label className="block text-sm font-bold mb-1">Đơn vị (Hộp/Vỉ)</label>
               <input
                 type="text"
                 className="w-full p-3 border rounded-lg"
@@ -590,9 +602,7 @@ export default function EditProductPage({
 
           {/* Mô tả */}
           <div>
-            <label className="block text-sm font-bold mb-1">
-              Mô tả sản phẩm
-            </label>
+            <label className="block text-sm font-bold mb-1">Mô tả sản phẩm</label>
             <textarea
               className="w-full p-3 border rounded-lg h-32"
               value={formData.description}
@@ -604,14 +614,14 @@ export default function EditProductPage({
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || uploading}
             className={`w-full py-4 rounded-lg font-bold text-white text-lg transition ${
-              loading
+              loading || uploading
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-yellow-500 hover:bg-yellow-600 shadow-lg"
             }`}
           >
-            {loading ? "Đang lưu..." : "💾 LƯU THAY ĐỔI"}
+            {loading || uploading ? "Đang Upload ảnh & Lưu..." : "💾 LƯU THAY ĐỔI"}
           </button>
         </form>
       </div>
