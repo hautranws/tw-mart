@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Image from "next/image"; // [QUAN TRỌNG] Thư viện ảnh tối ưu
 import Banner from "@/components/Banner";
 import FlashSale from "@/components/FlashSale";
 import AdminFlashSaleManager from "@/components/admin/AdminFlashSaleManager";
@@ -101,10 +102,8 @@ export default function AdminDashboard() {
       alert("Vui lòng nhập địa chỉ trước khi thêm!");
       return;
     }
-    // Chuyển hướng sang trang add stores kèm theo query address
-    // Bạn hãy đảm bảo đường dẫn '/admin/stores/add' là chính xác với file bạn tạo
     router.push(
-      `/admin/stores/add?address=${encodeURIComponent(quickAddress)}`,
+      `/admin/stores/add?address=${encodeURIComponent(quickAddress)}`
     );
   };
 
@@ -314,6 +313,22 @@ export default function AdminDashboard() {
                 Hỗ trợ trực tuyến
               </p>
             </Link>
+
+            {/* 7. [MỚI] Hệ thống nhà thuốc (Giữ nguyên từ code cũ của bạn) */}
+            <Link
+              href="/admin/stores"
+              className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-md border-2 border-transparent hover:border-rose-600 hover:shadow-xl transition cursor-pointer group"
+            >
+              <div className="text-5xl mb-3 group-hover:scale-110 transition">
+                🏥
+              </div>
+              <h3 className="text-xl font-bold text-rose-700 text-center">
+                Hệ Thống Thuốc
+              </h3>
+              <p className="text-gray-500 text-xs mt-1 text-center">
+                Địa chỉ & Bản đồ
+              </p>
+            </Link>
           </div>
 
           {/* --- [CODE MỚI] SECTION NHẬP ĐỊA CHỈ & THÊM STORE --- */}
@@ -384,11 +399,15 @@ export default function AdminDashboard() {
                   className="block group"
                 >
                   <div className="bg-white p-4 rounded-lg shadow hover:shadow-lg transition cursor-pointer relative border border-gray-100 flex flex-col justify-between h-full">
-                    <div className="h-40 rounded-lg mb-4 flex items-center justify-center overflow-hidden bg-gray-50">
-                      <img
+                    {/* [CODE MỚI] Thay thẻ img bằng Image của Next.js */}
+                    <div className="relative h-40 w-full mb-4 bg-gray-50 rounded-lg flex items-center justify-center overflow-hidden">
+                      <Image
                         src={product.img || "https://via.placeholder.com/150"}
-                        alt={product.title}
-                        className="h-full object-contain mix-blend-multiply"
+                        alt={product.title || product.name || "Sản phẩm"}
+                        fill // Tự động co giãn full khung
+                        className="object-contain mix-blend-multiply"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" // Chỉ tải ảnh nhỏ phù hợp màn hình
+                        loading="lazy"
                       />
                     </div>
                     <div>
