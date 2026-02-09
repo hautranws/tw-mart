@@ -1,13 +1,13 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient"; // Đảm bảo đường dẫn đúng
+import { supabase } from "@/lib/supabaseClient";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 
 export default function EditProductPage() {
   const router = useRouter();
   const params = useParams();
-  const id = params?.id; // Lấy ID từ URL
+  const id = params?.id;
 
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -39,7 +39,7 @@ export default function EditProductPage() {
       if (error) throw error;
 
       if (data) {
-        // Xử lý ảnh: Nếu ảnh là chuỗi JSON mảng ["url"], lấy cái đầu tiên để hiển thị trong ô input text
+        // Xử lý ảnh JSON
         let imgUrl = data.img;
         if (data.img && data.img.startsWith("[")) {
             try {
@@ -70,14 +70,13 @@ export default function EditProductPage() {
     setUpdating(true);
 
     try {
-      // Cập nhật lại vào Supabase
       const { error } = await supabase
         .from("products")
         .update({
           title: product.title,
           price: Number(product.price),
           old_price: Number(product.old_price),
-          img: product.img, // Lưu ý: Ở đây đang lưu chuỗi link ảnh đơn giản
+          img: product.img,
           category_id: product.category_id,
           description: product.description,
         })
@@ -86,7 +85,8 @@ export default function EditProductPage() {
       if (error) throw error;
 
       alert("Cập nhật thành công! 🎉");
-      router.push("/admin/activity"); // Quay lại trang nhật ký
+      // [QUAN TRỌNG] Sửa đường dẫn quay về trang Kho
+      router.push("/admin/inventory"); 
     } catch (error: any) {
       alert("Lỗi cập nhật: " + error.message);
     } finally {
@@ -101,8 +101,9 @@ export default function EditProductPage() {
       <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
         <div className="bg-blue-600 px-6 py-4 flex justify-between items-center">
           <h1 className="text-white text-xl font-bold">✏️ Chỉnh Sửa Sản Phẩm</h1>
-          <Link href="/admin/activity" className="text-blue-100 hover:text-white text-sm">
-             Quay lại
+          {/* [SỬA LINK] Quay về trang Kho */}
+          <Link href="/admin/inventory" className="text-blue-100 hover:text-white text-sm">
+             Quay lại Kho
           </Link>
         </div>
 
@@ -188,8 +189,10 @@ export default function EditProductPage() {
             >
               {updating ? "Đang lưu..." : "Lưu Thay Đổi"}
             </button>
+            
+            {/* [SỬA LINK] Nút Hủy quay về Kho */}
             <Link
-                href="/admin/activity"
+                href="/admin/inventory"
                 className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg font-bold hover:bg-gray-300 transition text-center"
             >
                 Hủy
