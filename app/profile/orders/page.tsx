@@ -26,15 +26,17 @@ export default function MyOrdersPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Giả sử bảng tên là 'orders' và có cột 'user_id'
+      // [ĐÃ SỬA] Lấy thêm dữ liệu từ bảng order_items
       const { data, error } = await supabase
         .from("orders")
-        .select("*")
+        .select("*, order_items(*)") 
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
       if (!error && data) {
         setOrders(data);
+      } else if (error) {
+        console.error("Lỗi lấy đơn hàng:", error);
       }
       setLoading(false);
     };
@@ -44,14 +46,14 @@ export default function MyOrdersPage() {
   // --- 2. LỌC ĐƠN HÀNG THEO TAB VÀ TÌM KIẾM ---
   const filteredOrders = orders.filter((order) => {
     // Lọc theo Tab (Trạng thái)
-    const matchStatus = activeTab === "all" ? true : order.status === activeTab;
+    const matchStatus = activeTab === "all" ? true : order.payment_status === activeTab || order.status === activeTab;
     
-    // Lọc theo Tìm kiếm (Mã đơn hoặc Tên sản phẩm trong JSON)
+    // Lọc theo Tìm kiếm (Mã đơn hoặc Tên sản phẩm)
     const matchSearch = 
         searchTerm === "" || 
         order.id.toString().includes(searchTerm) ||
-        // Tìm trong danh sách sản phẩm (nếu cột products là JSON)
-        (order.products && JSON.stringify(order.products).toLowerCase().includes(searchTerm.toLowerCase()));
+        // Tìm trong danh sách sản phẩm
+        (order.order_items && JSON.stringify(order.order_items).toLowerCase().includes(searchTerm.toLowerCase()));
 
     return matchStatus && matchSearch;
   });
@@ -60,6 +62,7 @@ export default function MyOrdersPage() {
   const renderStatusBadge = (status: string) => {
      switch(status) {
         case 'pending': return <span className="text-orange-500 font-bold flex items-center gap-1"><ShoppingBag size={14}/> Đang xử lý</span>;
+        case 'paid': return <span className="text-green-600 font-bold flex items-center gap-1"><CheckCircle size={14}/> Đã thanh toán</span>; // Thêm trạng thái thanh toán
         case 'shipping': return <span className="text-blue-500 font-bold flex items-center gap-1"><Truck size={14}/> Đang giao</span>;
         case 'completed': return <span className="text-green-500 font-bold flex items-center gap-1"><CheckCircle size={14}/> Đã giao</span>;
         case 'cancelled': return <span className="text-red-500 font-bold flex items-center gap-1"><XCircle size={14}/> Đã hủy</span>;
@@ -142,32 +145,35 @@ export default function MyOrdersPage() {
                            <div className="text-xs text-gray-500">{new Date(order.created_at).toLocaleDateString('vi-VN')}</div>
                         </div>
                         <div className="text-sm">
-                           {renderStatusBadge(order.status || 'pending')}
+                           {renderStatusBadge(order.payment_status === 'paid' ? 'paid' : (order.status || 'pending'))}
                         </div>
                      </div>
 
                      {/* Product Preview (Lấy sản phẩm đầu tiên làm đại diện) */}
                      <div className="flex gap-4 mb-4">
                         <div className="w-16 h-16 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden border">
-                            {/* Nếu có ảnh thì hiện, ko thì hiện icon */}
-                           {order.products && order.products[0]?.img ? (
-                              <img src={order.products[0].img} className="w-full h-full object-cover" />
+                           {/* Nếu có ảnh thì hiện, ko thì hiện icon túi mua sắm */}
+                           {order.order_items && order.order_items[0]?.img ? (
+                              <img src={order.order_items[0].img} className="w-full h-full object-cover" />
                            ) : (
                               <div className="w-full h-full flex items-center justify-center text-gray-400"><ShoppingBag size={24}/></div>
                            )}
                         </div>
                         <div className="flex-1">
                            <h4 className="font-bold text-sm text-gray-800 line-clamp-1">
-                              {order.products ? order.products[0]?.title : "Sản phẩm chưa đặt tên"}
+                              {/* [ĐÃ SỬA] Đọc tên từ order_items */}
+                              {order.order_items && order.order_items.length > 0 ? order.order_items[0].product_name : "Sản phẩm chưa đặt tên"}
                            </h4>
-                           <p className="text-xs text-gray-500">
-                              {order.products && order.products.length > 1 
-                                 ? `và ${order.products.length - 1} sản phẩm khác` 
-                                 : `Số lượng: ${order.products ? order.products[0]?.quantity : 1}`}
+                           <p className="text-xs text-gray-500 mt-1">
+                              {/* [ĐÃ SỬA] Đọc số lượng từ order_items */}
+                              {order.order_items && order.order_items.length > 1 
+                                 ? `và ${order.order_items.length - 1} sản phẩm khác` 
+                                 : `Số lượng: ${order.order_items && order.order_items.length > 0 ? order.order_items[0].quantity : 1}`}
                            </p>
                         </div>
                         <div className="text-right">
-                           <div className="text-red-600 font-bold">{Number(order.total || 0).toLocaleString()}đ</div>
+                           {/* [ĐÃ SỬA] Lấy final_price thay vì total */}
+                           <div className="text-red-600 font-bold">{Number(order.final_price || 0).toLocaleString("vi-VN")}đ</div>
                         </div>
                      </div>
 

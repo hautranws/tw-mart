@@ -5,11 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
-// --- KHUNG GIỜ GIAO HÀNG (Cho TP.HCM) ---
+// --- KHUNG GIỜ GIAO HÀNG (Giữ lại biến để không bị lỗi code cũ) ---
 const TIME_SLOTS = [
-    "08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00",
-    "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00", "16:00 - 17:00",
-    "17:00 - 18:00", "18:00 - 19:00", "19:00 - 20:00", "20:00 - 21:00"
+  "08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00",
+  "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00", "16:00 - 17:00",
+  "17:00 - 18:00", "18:00 - 19:00", "19:00 - 20:00", "20:00 - 21:00"
 ];
 
 export default function CheckoutPage() {
@@ -42,7 +42,7 @@ export default function CheckoutPage() {
   const [formValues, setFormValues] = useState({ fullName: "", phone: "", note: "" });
 
   // --- STATE THỜI GIAN NHẬN HÀNG ---
-  const [deliveryDates, setDeliveryDates] = useState<string[]>([]); // 4 ngày tới
+  const [deliveryDates, setDeliveryDates] = useState<string[]>([]); 
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>("");
   const [shippingEstimate, setShippingEstimate] = useState<string>(""); 
@@ -60,12 +60,32 @@ export default function CheckoutPage() {
     .filter((item) => selectedItems.includes(item.id))
     .reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  // --- LOGIC PHÍ SHIP ---
-  const shippingFee = deliveryMethod === 'store' ? 0 : (subTotal >= 300000 ? 0 : 30000);
+  // --- LOGIC ĐỊA ĐIỂM (Đưa lên trên để tính phí Ship) ---
+  const currentCityName = useMemo(() => {
+      if (deliveryMethod === 'store') return ""; 
+      if (selectedAddressId !== 'new') {
+          const addr = savedAddresses.find(a => a.id.toString() === selectedAddressId);
+          return addr ? addr.full_address : ""; 
+      }
+      return addressData.city.split("|")[1] || "";
+  }, [selectedAddressId, addressData.city, savedAddresses, deliveryMethod]);
+
+  const isHCMC = useMemo(() => {
+      const lowerCity = currentCityName.toLowerCase();
+      return lowerCity.includes("hồ chí minh") || lowerCity.includes("hcm") || lowerCity.includes("sài gòn");
+  }, [currentCityName]);
+
+  // --- LOGIC PHÍ SHIP CHUẨN SHOPEE ---
+  const shippingFee = useMemo(() => {
+      if (deliveryMethod === 'store') return 0;
+      // Đơn >= 50k là Freeship
+      if (subTotal >= 50000) return 0; 
+      // Dưới 50k: HCM 18k, tỉnh khác 32k
+      return isHCMC ? 18000 : 32000; 
+  }, [deliveryMethod, subTotal, isHCMC]);
 
   // --- INIT DATA ---
   useEffect(() => {
-      // 1. Tạo ngày giao hàng
       const dates = [];
       const today = new Date();
       for(let i = 0; i < 4; i++) {
@@ -78,7 +98,6 @@ export default function CheckoutPage() {
       setDeliveryDates(dates);
       setSelectedDate(dates[0]);
 
-      // 2. Fetch Tỉnh/Thành
       const fetchCities = async () => {
           try {
               const res = await fetch("https://provinces.open-api.vn/api/?depth=1");
@@ -88,7 +107,6 @@ export default function CheckoutPage() {
       };
       fetchCities();
 
-      // 3. [MỚI] Fetch Danh sách nhà thuốc từ DB
       const fetchStores = async () => {
           const { data } = await supabase.from('stores').select('*').eq('is_active', true);
           if (data) setPharmacyLocations(data);
@@ -97,7 +115,6 @@ export default function CheckoutPage() {
 
   }, []);
 
-  // ... (Giữ nguyên logic fetch Quận/Huyện/Xã) ...
   useEffect(() => {
       if (addressData.city) {
           const fetchDistricts = async () => {
@@ -122,7 +139,6 @@ export default function CheckoutPage() {
       }
   }, [addressData.district]);
 
-  // Lấy User và Coupon
   useEffect(() => {
     if (cart.length > 0 && selectedItems.length === 0) setSelectedItems(cart.map((item) => item.id));
     
@@ -135,7 +151,7 @@ export default function CheckoutPage() {
             
             const { data: lastOrder } = await supabase.from("orders").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).single();
             if (lastOrder) {
-                setFormValues({ fullName: lastOrder.customer_name, phone: lastOrder.customer_phone, note: "" });
+                setFormValues({ fullName: lastOrder.customer_name || "", phone: lastOrder.customer_phone || "", note: "" });
             } else {
                 setFormValues(prev => ({ ...prev, phone: user.phone || "" }));
             }
@@ -149,27 +165,17 @@ export default function CheckoutPage() {
     fetchData(); fetchCoupons();
   }, [cart]);
 
-  // --- LOGIC ĐỊA ĐIỂM ---
-  const currentCityName = useMemo(() => {
-      if (deliveryMethod === 'store') return ""; 
-      if (selectedAddressId !== 'new') {
-          const addr = savedAddresses.find(a => a.id.toString() === selectedAddressId);
-          return addr ? addr.full_address : ""; 
-      }
-      return addressData.city.split("|")[1] || "";
-  }, [selectedAddressId, addressData.city, savedAddresses, deliveryMethod]);
-
-  const isHCMC = useMemo(() => {
-      const lowerCity = currentCityName.toLowerCase();
-      return lowerCity.includes("hồ chí minh") || lowerCity.includes("hcm") || lowerCity.includes("sài gòn");
-  }, [currentCityName]);
-
+  // --- TÍNH NGÀY GIAO HÀNG CHUẨN SHOPEE ---
   useEffect(() => {
-      if (!isHCMC && currentCityName) {
+      if (currentCityName) {
           const lowerCity = currentCityName.toLowerCase();
           const today = new Date();
-          let minDays = 3, maxDays = 5;
-          if (lowerCity.includes("long an") || lowerCity.includes("tiền giang") || lowerCity.includes("cần thơ") || lowerCity.includes("bình dương") || lowerCity.includes("đồng nai")) {
+          let minDays = 3, maxDays = 5; // Mặc định tỉnh xa là 3-5 ngày
+
+          if (isHCMC) {
+              minDays = 1; maxDays = 3; // HCM 1-3 ngày
+          }
+          else if (lowerCity.includes("long an") || lowerCity.includes("tiền giang") || lowerCity.includes("cần thơ") || lowerCity.includes("bình dương") || lowerCity.includes("đồng nai")) {
               minDays = 2; maxDays = 3;
           } else if (lowerCity.includes("đà nẵng") || lowerCity.includes("huế")) {
               minDays = 3; maxDays = 4;
@@ -178,7 +184,7 @@ export default function CheckoutPage() {
           }
           const dateMin = new Date(today); dateMin.setDate(today.getDate() + minDays);
           const dateMax = new Date(today); dateMax.setDate(today.getDate() + maxDays);
-          setShippingEstimate(`Dự kiến giao hàng: ${dateMin.getDate()}/${dateMin.getMonth()+1} - ${dateMax.getDate()}/${dateMax.getMonth()+1}`);
+          setShippingEstimate(`Nhận hàng từ: ${dateMin.getDate()}/${dateMin.getMonth()+1} - ${dateMax.getDate()}/${dateMax.getMonth()+1}`);
       }
   }, [isHCMC, currentCityName]);
 
@@ -195,7 +201,7 @@ export default function CheckoutPage() {
       const id = e.target.value; setSelectedAddressId(id);
       if (id !== 'new') {
           const addr = savedAddresses.find(a => a.id.toString() === id);
-          if (addr) setFormValues(prev => ({ ...prev, fullName: addr.name, phone: addr.phone }));
+          if (addr) setFormValues(prev => ({ ...prev, fullName: addr.name || "", phone: addr.phone || "" }));
       } else { setAddressData({ city: "", district: "", ward: "", specific: "" }); }
   };
 
@@ -205,61 +211,118 @@ export default function CheckoutPage() {
       return `${addressData.specific}, ${ward}, ${dist}, ${city}`.replace(/^, /, "").replace(/, ,/g, ",");
   };
 
-  // --- [SỬA] LỌC NHÀ THUỐC TỪ DB ---
   const filteredStores = pharmacyLocations.filter(store => {
       if (!addressData.city) return true;
       const currentCityCode = addressData.city.split("|")[0]; 
-      // So sánh mã tỉnh (Trong DB lưu 'city_code', API trả về 'code')
       return store.city_code === currentCityCode;
   });
 
   const finalAmount = subTotal - discountAmount + shippingFee;
 
-  // Check Coupon
+  // Function Check Coupon thủ công (nếu khách tự nhập mã riêng)
   const checkCoupon = async (codeOverride?: string) => {
-    setCouponMessage({ type: "", text: "" }); setDiscountAmount(0); setAppliedCoupon(null); setCheckingCoupon(true);
+    setCouponMessage({ type: "", text: "" }); setCheckingCoupon(true);
     const codeToTest = (codeOverride || couponCode).toUpperCase().trim();
     if (codeOverride) setCouponCode(codeOverride);
     if (!codeToTest) { setCheckingCoupon(false); return; }
     try {
         const { data: coupon, error } = await supabase.from("coupons").select("*").eq("code", codeToTest).eq("is_active", true).single();
-        if (error || !coupon) { setCouponMessage({ type: "error", text: "❌ Mã không tồn tại!" }); return; }
-        if (subTotal < coupon.min_order_value) { setCouponMessage({ type: "error", text: `❌ Đơn từ ${Number(coupon.min_order_value).toLocaleString()}đ mới được dùng!` }); return; }
+        if (error || !coupon) { setAppliedCoupon(null); setDiscountAmount(0); setCouponMessage({ type: "error", text: "❌ Mã không tồn tại!" }); return; }
+        if (subTotal < coupon.min_order_value) { setAppliedCoupon(null); setDiscountAmount(0); setCouponMessage({ type: "error", text: `❌ Đơn từ ${Number(coupon.min_order_value).toLocaleString("vi-VN")}đ mới được dùng!` }); return; }
+        
         let discount = 0;
         if (coupon.discount_type === "percent") {
             discount = (subTotal * coupon.discount_value) / 100;
             if (coupon.max_discount_amount > 0 && discount > coupon.max_discount_amount) discount = coupon.max_discount_amount;
         } else { discount = coupon.discount_value; }
         if (discount > subTotal) discount = subTotal;
-        setDiscountAmount(discount); setAppliedCoupon(coupon); setCouponMessage({ type: "success", text: `✅ Áp dụng thành công: -${discount.toLocaleString()}đ` });
+        
+        setDiscountAmount(discount); 
+        setAppliedCoupon(coupon); 
+        setCouponMessage({ type: "success", text: `✅ Áp dụng thành công: -${discount.toLocaleString("vi-VN")}đ` });
     } catch (err) { console.error(err); } finally { setCheckingCoupon(false); }
   };
 
-  useEffect(() => { if (appliedCoupon && subTotal < appliedCoupon.min_order_value) { setAppliedCoupon(null); setDiscountAmount(0); setCouponMessage({ type: "error", text: "⚠️ Mã đã bị hủy do không đủ điều kiện!" }); } }, [subTotal]);
+  // --- [MỚI] LOGIC TỰ ĐỘNG CHỌN MÃ GIẢM GIÁ TỐT NHẤT ---
+  // Tìm mã mang lại mức giảm lớn nhất cho khách hàng
+  const bestCouponId = useMemo(() => {
+      let bestId = null;
+      let maxD = 0;
+      availableCoupons.forEach(c => {
+          if (subTotal >= c.min_order_value) {
+              let d = c.discount_type === 'percent' ? (subTotal * c.discount_value) / 100 : c.discount_value;
+              if (c.max_discount_amount > 0 && d > c.max_discount_amount) d = c.max_discount_amount;
+              if (d > subTotal) d = subTotal;
+              if (d > maxD) {
+                  maxD = d;
+                  bestId = c.id;
+              }
+          }
+      });
+      return bestId;
+  }, [availableCoupons, subTotal]);
+
+  useEffect(() => {
+      let best = null;
+      let maxD = 0;
+      availableCoupons.forEach(c => {
+          if (subTotal >= c.min_order_value) {
+              let d = c.discount_type === 'percent' ? (subTotal * c.discount_value) / 100 : c.discount_value;
+              if (c.max_discount_amount > 0 && d > c.max_discount_amount) d = c.max_discount_amount;
+              if (d > subTotal) d = subTotal;
+              if (d > maxD) { maxD = d; best = c; }
+          }
+      });
+
+      let currentD = 0;
+      let currentValid = false;
+      if (appliedCoupon) {
+          if (subTotal >= appliedCoupon.min_order_value) {
+              currentValid = true;
+              currentD = appliedCoupon.discount_type === 'percent' ? (subTotal * appliedCoupon.discount_value) / 100 : appliedCoupon.discount_value;
+              if (appliedCoupon.max_discount_amount > 0 && currentD > appliedCoupon.max_discount_amount) currentD = appliedCoupon.max_discount_amount;
+              if (currentD > subTotal) currentD = subTotal;
+          }
+      }
+
+      // Tự động áp dụng nếu tìm thấy mã Tốt hơn mã hiện tại, hoặc đang không có mã
+      if (best && maxD > currentD) {
+          if (appliedCoupon?.id !== best.id || discountAmount !== maxD) {
+              setAppliedCoupon(best);
+              setCouponCode(best.code);
+              setDiscountAmount(maxD);
+              setCouponMessage({ type: "success", text: `✅ Đã tự động áp dụng mã ưu đãi lớn nhất: -${maxD.toLocaleString("vi-VN")}đ` });
+          }
+      } else if (currentValid) {
+          if (discountAmount !== currentD) setDiscountAmount(currentD);
+      } else {
+          if (appliedCoupon !== null || discountAmount !== 0) {
+              setAppliedCoupon(null);
+              setDiscountAmount(0);
+              if (couponMessage.text !== "⚠️ Mã đã bị hủy do chưa đủ điều kiện!") {
+                  setCouponMessage({ type: "error", text: "⚠️ Mã đã bị hủy do chưa đủ điều kiện!" });
+              }
+          }
+      }
+  }, [subTotal, availableCoupons, appliedCoupon, discountAmount, couponMessage.text]);
 
   // Handle Order
   const handleOrder = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true);
     if (selectedItems.length === 0) { alert("Giỏ hàng trống!"); setLoading(false); return; }
     
-    // [SỬA] Lấy địa chỉ từ danh sách DB
     const selectedStore = pharmacyLocations.find(s => s.id === selectedStoreId);
     const finalAddress = deliveryMethod === 'store' 
         ? `[NHẬN TẠI KHO] ${selectedStore?.name} - ${selectedStore?.address}`
         : getFullAddress();
     
     if (deliveryMethod === 'home' && (selectedAddressId === 'new' && (!addressData.city || !addressData.specific))) { alert("Vui lòng điền địa chỉ!"); setLoading(false); return; }
-    if (deliveryMethod === 'home' && isHCMC && !selectedTimeSlot) { alert("Vui lòng chọn giờ nhận hàng!"); setLoading(false); return; } 
 
     if (user && deliveryMethod === 'home' && selectedAddressId === 'new') { try { await supabase.from("user_addresses").insert([{ user_id: user.id, name: formValues.fullName, phone: formValues.phone, full_address: finalAddress, is_default: savedAddresses.length === 0 }]); } catch (err) {} }
 
     let deliveryNote = "";
     if (deliveryMethod === 'home') {
-        if (isHCMC) {
-            deliveryNote = `Giao hàng: ${selectedTimeSlot}, ${selectedDate}`;
-        } else {
-            deliveryNote = shippingEstimate;
-        }
+        deliveryNote = `Giao tiêu chuẩn: ${shippingEstimate}`;
     }
 
     const orderInfo = {
@@ -272,7 +335,15 @@ export default function CheckoutPage() {
     try {
       const response = await fetch("/api/payment/create", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: itemsToOrder, totalAmount: finalAmount, subTotal: subTotal, couponCode: appliedCoupon ? appliedCoupon.code : null, customer: orderInfo, paymentMethod: paymentMethod, }),
+        body: JSON.stringify({ 
+          items: itemsToOrder, 
+          totalAmount: finalAmount, 
+          subTotal: subTotal, 
+          couponCode: appliedCoupon ? appliedCoupon.code : null, 
+          customer: orderInfo, 
+          paymentMethod: paymentMethod,
+          userId: user?.id 
+        }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
@@ -331,8 +402,8 @@ export default function CheckoutPage() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
-                  <input required name="fullName" type="text" placeholder="Họ và tên" className="w-full border p-3 rounded-lg bg-gray-50" value={formValues.fullName} onChange={(e) => setFormValues({...formValues, fullName: e.target.value})} />
-                  <input required name="phone" type="tel" placeholder="Số điện thoại" className="w-full border p-3 rounded-lg bg-gray-50" value={formValues.phone} onChange={(e) => setFormValues({...formValues, phone: e.target.value})} />
+                  <input required name="fullName" type="text" placeholder="Họ và tên" className="w-full border p-3 rounded-lg bg-gray-50" value={formValues.fullName || ""} onChange={(e) => setFormValues({...formValues, fullName: e.target.value})} />
+                  <input required name="phone" type="tel" placeholder="Số điện thoại" className="w-full border p-3 rounded-lg bg-gray-50" value={formValues.phone || ""} onChange={(e) => setFormValues({...formValues, phone: e.target.value})} />
                 </div>
 
                 {deliveryMethod === 'home' && (
@@ -340,7 +411,7 @@ export default function CheckoutPage() {
                         {savedAddresses.length > 0 && (
                             <div className="mb-2">
                                 <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Sổ địa chỉ:</label>
-                                <select value={selectedAddressId} onChange={handleAddressBookChange} className="w-full border p-2.5 rounded-lg text-sm bg-blue-50 border-blue-200 text-blue-800">
+                                <select value={selectedAddressId || ""} onChange={handleAddressBookChange} className="w-full border p-2.5 rounded-lg text-sm bg-blue-50 border-blue-200 text-blue-800">
                                     {savedAddresses.map(a => <option key={a.id} value={a.id}>{a.name} - {a.full_address.substring(0,30)}...</option>)}
                                     <option value="new">+ Thêm địa chỉ mới</option>
                                 </select>
@@ -350,49 +421,36 @@ export default function CheckoutPage() {
                         {selectedAddressId === 'new' && (
                             <div className="space-y-3 bg-gray-50 p-3 rounded border">
                                 <p className="text-xs font-bold text-gray-500 uppercase">Địa chỉ nhận hàng mới:</p>
-                                <select className="w-full p-2 border rounded" value={addressData.city} onChange={(e) => setAddressData({ ...addressData, city: e.target.value, district: "", ward: "" })}>
+                                <select className="w-full p-2 border rounded" value={addressData.city || ""} onChange={(e) => setAddressData({ ...addressData, city: e.target.value, district: "", ward: "" })}>
                                     <option value="">-- Chọn Tỉnh/Thành phố --</option>
                                     {cities.map((c: any) => <option key={c.code} value={`${c.code}|${c.name}`}>{c.name}</option>)}
                                 </select>
-                                <select className="w-full p-2 border rounded" value={addressData.district} disabled={!addressData.city} onChange={(e) => setAddressData({ ...addressData, district: e.target.value, ward: "" })}>
+                                <select className="w-full p-2 border rounded" value={addressData.district || ""} disabled={!addressData.city} onChange={(e) => setAddressData({ ...addressData, district: e.target.value, ward: "" })}>
                                     <option value="">-- Chọn Quận/Huyện --</option>
                                     {districts.map((d: any) => <option key={d.code} value={`${d.code}|${d.name}`}>{d.name}</option>)}
                                 </select>
-                                <select className="w-full p-2 border rounded" value={addressData.ward} disabled={!addressData.district} onChange={(e) => setAddressData({ ...addressData, ward: e.target.value })}>
+                                <select className="w-full p-2 border rounded" value={addressData.ward || ""} disabled={!addressData.district} onChange={(e) => setAddressData({ ...addressData, ward: e.target.value })}>
                                     <option value="">-- Chọn Phường/Xã --</option>
                                     {wards.map((w: any) => <option key={w.code} value={`${w.code}|${w.name}`}>{w.name}</option>)}
                                 </select>
-                                <input type="text" placeholder="Số nhà, tên đường cụ thể..." className="w-full p-2 border rounded" value={addressData.specific} onChange={(e) => setAddressData({ ...addressData, specific: e.target.value })}/>
+                                <input type="text" placeholder="Số nhà, tên đường cụ thể..." className="w-full p-2 border rounded" value={addressData.specific || ""} onChange={(e) => setAddressData({ ...addressData, specific: e.target.value })}/>
                             </div>
                         )}
 
                         <div className="pt-2">
-                            {isHCMC ? (
-                                <div className="bg-blue-50 p-3 rounded border border-blue-200">
-                                    <p className="text-xs font-bold text-blue-800 uppercase mb-2">⏱ Chọn thời gian nhận (TP.HCM):</p>
-                                    <div className="flex gap-2 overflow-x-auto pb-2">
-                                        {deliveryDates.map(date => (
-                                            <button key={date} type="button" onClick={() => { setSelectedDate(date); setSelectedTimeSlot(""); }} className={`px-3 py-1 rounded text-xs font-bold whitespace-nowrap border ${selectedDate === date ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600'}`}>{date}</button>
-                                        ))}
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2 mt-2">
-                                        {availableTimeSlots.length > 0 ? availableTimeSlots.map(slot => (
-                                            <button key={slot} type="button" onClick={() => setSelectedTimeSlot(slot)} className={`py-1.5 rounded text-xs text-center border ${selectedTimeSlot === slot ? 'bg-green-600 text-white border-green-600' : 'bg-white hover:bg-gray-100'}`}>{slot}</button>
-                                        )) : <p className="text-xs text-gray-500 col-span-3 text-center italic">Đã hết giờ giao hôm nay.</p>}
-                                    </div>
-                                    {selectedTimeSlot && <p className="text-xs text-green-700 mt-2 font-bold">✓ Giao lúc: {selectedTimeSlot}, {selectedDate}</p>}
+                            <div className="bg-blue-50 p-3 rounded border border-blue-200 flex items-center gap-3">
+                                <span className="text-2xl text-blue-600">🚚</span>
+                                <div>
+                                    <p className="text-sm font-bold text-blue-800">Giao hàng tiêu chuẩn</p>
+                                    <p className="text-xs text-blue-700 font-medium">
+                                        {shippingEstimate || "Vui lòng chọn địa chỉ để xem ngày giao"}
+                                    </p>
                                 </div>
-                            ) : (
-                                <div className="bg-orange-50 p-3 rounded border border-orange-200 flex items-center gap-3">
-                                    <span className="text-2xl">🚚</span>
-                                    <div><p className="text-sm font-bold text-orange-800">Thời gian giao hàng dự kiến</p><p className="text-xs text-orange-700">{shippingEstimate || "Vui lòng chọn địa chỉ để xem ngày giao"}</p></div>
-                                </div>
-                            )}
+                            </div>
                         </div>
                     </div>
                 )}
 
-                {/* --- [SỬA] LOGIC NHẬN TẠI KHO (Dữ liệu thật) --- */}
                 {deliveryMethod === 'store' && (
                     <div className="space-y-2 animate-fade-in border-t pt-4 mt-4">
                         <p className="text-sm font-bold text-gray-600">
@@ -411,24 +469,81 @@ export default function CheckoutPage() {
                     </div>
                 )}
 
-                <textarea name="note" rows={1} placeholder="Ghi chú đơn hàng (nếu có)" className="w-full border p-3 rounded-lg bg-gray-50 mt-4" value={formValues.note} onChange={(e) => setFormValues({...formValues, note: e.target.value})}></textarea>
+                <textarea name="note" rows={1} placeholder="Ghi chú đơn hàng (nếu có)" className="w-full border p-3 rounded-lg bg-gray-50 mt-4" value={formValues.note || ""} onChange={(e) => setFormValues({...formValues, note: e.target.value})}></textarea>
 
-                <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-dashed border-blue-300">
-                  <div className="flex gap-2">
-                    <input type="text" placeholder="Mã giảm giá" className="flex-1 p-2 border rounded font-bold uppercase" value={couponCode} onChange={(e) => setCouponCode(e.target.value)} />
-                    <button type="button" onClick={() => checkCoupon()} disabled={checkingCoupon} className="bg-blue-600 text-white px-4 rounded font-bold">{checkingCoupon ? "..." : "Áp dụng"}</button>
+                <div className="mt-6 border-t pt-4">
+                  <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase">Phương thức thanh toán</h3>
+                  <div className="space-y-3">
+                    <label className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition border-blue-600 bg-blue-50`}>
+                      <input 
+                        type="radio" 
+                        name="payment" 
+                        value="COD" 
+                        checked={paymentMethod === 'COD'} 
+                        readOnly
+                        className="w-4 h-4 text-blue-600" 
+                      />
+                      <div className="flex-1">
+                        <p className="font-bold text-gray-800 text-sm">Thanh toán khi nhận hàng (COD)</p>
+                        <p className="text-xs text-gray-500">Nhận hàng, kiểm tra rồi mới thanh toán bằng tiền mặt</p>
+                      </div>
+                    </label>
                   </div>
-                  {couponMessage.text && <p className={`text-xs mt-2 font-bold ${couponMessage.type === 'error' ? 'text-red-600' : 'text-green-600'}`}>{couponMessage.text}</p>}
+                </div>
+
+                {/* --- [SỬA] KHU VỰC HIỂN THỊ MÃ GIẢM GIÁ --- */}
+                <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-dashed border-blue-300">
+                  <div className="flex gap-2 mb-2">
+                    <input type="text" placeholder="Nhập mã giảm giá..." className="flex-1 p-2 border rounded font-bold uppercase outline-none focus:ring-2 focus:ring-blue-400" value={couponCode || ""} onChange={(e) => setCouponCode(e.target.value)} />
+                    <button type="button" onClick={() => checkCoupon()} disabled={checkingCoupon} className="bg-blue-600 hover:bg-blue-700 text-white px-4 rounded font-bold transition">{checkingCoupon ? "..." : "Áp dụng"}</button>
+                  </div>
+                  
+                  {couponMessage.text && <p className={`text-xs font-bold ${couponMessage.type === 'error' ? 'text-red-600' : 'text-green-600'}`}>{couponMessage.text}</p>}
+                  
                   {availableCoupons.length > 0 && (
-                    <div className="mt-3 pt-3 border-t">
-                        <p className="text-xs font-bold text-gray-500 uppercase mb-2">🎁 Mã dành cho bạn:</p>
-                        <div className="space-y-2">
-                            {availableCoupons.map((c) => (
-                                <div key={c.id} className="flex justify-between bg-white border border-yellow-300 p-2 rounded text-xs shadow-sm">
-                                    <div><span className="font-bold text-blue-800">{c.code}</span> - {c.discount_type === 'percent' ? `Giảm ${c.discount_value}%` : `Giảm ${c.discount_value/1000}k`}</div>
-                                    <button type="button" onClick={() => checkCoupon(c.code)} className="text-blue-600 font-bold hover:underline">Dùng</button>
-                                </div>
-                            ))}
+                    <div className="mt-4 pt-4 border-t border-dashed border-blue-200">
+                        <p className="text-xs font-bold text-gray-500 uppercase mb-3">🎁 Mã ưu đãi dành cho bạn:</p>
+                        <div className="space-y-3">
+                            {availableCoupons.map((c) => {
+                                const isBest = c.id === bestCouponId;
+                                const isApplied = appliedCoupon?.id === c.id;
+                                
+                                return (
+                                    <div key={c.id} className={`flex flex-col p-3 rounded-lg border transition-all ${isApplied ? 'border-blue-500 bg-blue-50 shadow-md' : 'bg-white border-gray-200 shadow-sm hover:border-blue-300'}`}>
+                                        <div className="flex justify-between items-start mb-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold text-blue-800 text-base">{c.code}</span>
+                                                {/* NHÃN ĐỎ CHO MÃ TỐT NHẤT */}
+                                                {isBest && <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">🔥 Tốt nhất</span>}
+                                            </div>
+                                            <button 
+                                                type="button" 
+                                                onClick={() => checkCoupon(c.code)} 
+                                                className={`font-bold text-xs px-3 py-1.5 rounded transition-all ${isApplied ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-100 text-blue-600 hover:bg-blue-200'}`} 
+                                                disabled={isApplied}
+                                            >
+                                                {isApplied ? "Đang dùng" : "Dùng mã"}
+                                            </button>
+                                        </div>
+                                        <div className="text-gray-600 text-xs space-y-1 mt-1">
+                                            <p>
+                                                <span className="font-semibold text-gray-800">Giảm {c.discount_type === 'percent' ? `${c.discount_value}%` : `${(c.discount_value).toLocaleString("vi-VN")}đ`}</span>
+                                                {c.max_discount_amount > 0 && <span> (Tối đa {(c.max_discount_amount).toLocaleString("vi-VN")}đ)</span>}
+                                            </p>
+                                            <p>Đơn tối thiểu: {(c.min_order_value).toLocaleString("vi-VN")}đ</p>
+                                        </div>
+                                        
+                                        {/* THÔNG BÁO MUA THÊM ĐỂ ĐƯỢC DÙNG MÃ */}
+                                        {subTotal < c.min_order_value && (
+                                            <div className="mt-2 pt-2 border-t border-gray-100">
+                                                <p className="text-red-500 text-[11px] font-medium flex items-center gap-1">
+                                                    <span>❌</span> Mua thêm {(c.min_order_value - subTotal).toLocaleString("vi-VN")}đ để dùng mã này
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                   )}
@@ -440,7 +555,8 @@ export default function CheckoutPage() {
                         <span>Phí vận chuyển:</span>
                         {shippingFee === 0 ? <span className="text-green-600 font-bold">Miễn phí</span> : <span>{shippingFee.toLocaleString("vi-VN")}đ</span>}
                     </div>
-                    {deliveryMethod === 'home' && subTotal < 300000 && <p className="text-xs text-orange-500 italic text-right">Mua thêm {(300000 - subTotal).toLocaleString()}đ để được Freeship</p>}
+                    {deliveryMethod === 'home' && subTotal < 50000 && <p className="text-xs text-orange-500 italic text-right">Mua thêm {(50000 - subTotal).toLocaleString("vi-VN")}đ để được Freeship</p>}
+                    
                     {discountAmount > 0 && <div className="flex justify-between text-green-600 font-bold"><span>Giảm giá:</span><span>-{discountAmount.toLocaleString("vi-VN")}đ</span></div>}
                     <div className="flex justify-between pt-2 border-t border-dashed text-base">
                         <span className="font-bold">Tổng thanh toán:</span>
@@ -448,7 +564,7 @@ export default function CheckoutPage() {
                     </div>
                 </div>
 
-                <button type="submit" disabled={loading} className={`w-full text-white font-bold py-4 rounded-lg mt-4 shadow-lg ${loading ? "bg-gray-400" : "bg-red-600 hover:bg-red-700"}`}>
+                <button type="submit" disabled={loading} className={`w-full text-white font-bold py-4 rounded-lg mt-4 shadow-lg ${loading ? "bg-gray-400" : "bg-red-600 hover:bg-red-700 transition"}`}>
                   {loading ? "ĐANG XỬ LÝ..." : `THANH TOÁN NGAY`}
                 </button>
               </form>

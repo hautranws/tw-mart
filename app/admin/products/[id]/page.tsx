@@ -7,7 +7,7 @@ import Link from "next/link";
 export default function EditProductPage() {
   const router = useRouter();
   const params = useParams();
-  const id = params?.id;
+  const id = params?.id as string; // Ép kiểu string để tránh lỗi Typescript/Next.js
 
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -28,6 +28,7 @@ export default function EditProductPage() {
 
   useEffect(() => {
     if (id) fetchProductDetail();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const fetchProductDetail = async () => {
@@ -164,7 +165,7 @@ export default function EditProductPage() {
         <div className="bg-blue-600 px-6 py-4 flex justify-between items-center">
           <h1 className="text-white text-xl font-bold">✏️ Chỉnh Sửa Sản Phẩm</h1>
           <Link href="/admin/inventory" className="text-blue-100 hover:text-white text-sm font-bold">
-             ↩ Quay lại Kho
+              ↩ Quay lại Kho
           </Link>
         </div>
 

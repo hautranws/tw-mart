@@ -52,8 +52,9 @@ export default async function Home() {
                   Sản phẩm bán chạy
                 </h2>
               </div>
+              {/* --- ĐÃ SỬA: Đổi link tạm về trang chủ để không bị lỗi 404 --- */}
               <Link
-                href="/san-pham-ban-chay"
+                href="/"
                 className="text-sm bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full transition"
               >
                 Xem tất cả →
@@ -63,8 +64,9 @@ export default async function Home() {
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-0 divide-x divide-y divide-gray-100">
               {bestSellers && bestSellers.length > 0 ? (
                 bestSellers.map((product) => (
+                  // --- [ĐÃ SỬA CHỖ NÀY] Đổi /san-pham/ thành /product/ ---
                   <Link
-                    href={`/san-pham/${product.id}`}
+                    href={`/product/${product.id}`}
                     key={product.id}
                     className="group block p-4 hover:shadow-lg transition relative bg-white"
                   >

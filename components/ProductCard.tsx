@@ -15,7 +15,6 @@ interface ProductProps {
 }
 
 const ProductCard: React.FC<ProductProps> = ({ product }) => {
-  // 2. Lấy hàm addToCart từ kho
   const { addToCart } = useCart();
 
   const getThumbnail = (imgData: string) => {
@@ -30,7 +29,7 @@ const ProductCard: React.FC<ProductProps> = ({ product }) => {
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-shadow duration-300 p-4 flex flex-col h-full relative group">
-      {/* --- SỬA LẠI LINK: đổi 'products' thành 'product' --- */}
+      {/* Link đã chốt chuẩn là /product/ */}
       <Link href={`/product/${product.id}`} className="block mb-3">
         <div className="w-full aspect-square flex items-center justify-center overflow-hidden rounded-lg cursor-pointer">
           <img
@@ -41,7 +40,6 @@ const ProductCard: React.FC<ProductProps> = ({ product }) => {
         </div>
       </Link>
 
-      {/* --- SỬA LẠI LINK: đổi 'products' thành 'product' --- */}
       <Link href={`/product/${product.id}`} className="block mb-2">
         <h3
           className="text-gray-900 font-semibold text-sm leading-tight line-clamp-2 min-h-[40px] hover:text-blue-600 transition-colors cursor-pointer"
@@ -74,7 +72,6 @@ const ProductCard: React.FC<ProductProps> = ({ product }) => {
 
       <button
         className="mt-auto w-full bg-blue-600 text-white font-bold py-2.5 rounded-full hover:bg-blue-700 transition-colors text-sm"
-        // Gọi hàm thêm thật
         onClick={() => addToCart(product)}
       >
         Chọn mua

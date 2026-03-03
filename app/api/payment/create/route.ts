@@ -8,13 +8,18 @@ import { createMoMoUrl } from "../../../../lib/payment/momo";
 import { createPayOSLink } from "../../../../lib/payment/payos";
 
 // ==================================================================
-// ⚙️ CẤU HÌNH GỬI THÔNG BÁO
+// ⚙️ CẤU HÌNH GỬI THÔNG BÁO (BẠN ĐIỀN THÔNG TIN VÀO ĐÂY NHÉ)
 // ==================================================================
 
 const EMAIL_CONFIG = {
-  user: "email_cua_ban@gmail.com",
-  pass: "xxxx xxxx xxxx xxxx",
-  staffEmail: "email_nhan_vien@gmail.com",
+  // 1. Email dùng để gửi thông báo (VD: nhathuocthienhau@gmail.com)
+  user: "thienduoc.thienhau@gmail.com", 
+  
+  // 2. Mật khẩu ứng dụng 16 chữ cái (KHÔNG phải mật khẩu đăng nhập Gmail)
+  pass: "raew vtrg lkda ocwd", 
+  
+  // 3. Email nhận thông báo khi có đơn mới (có thể giống email trên)
+  staffEmail: "hautranws@gmail.com,phamanhthu1804@gmail.com",
 };
 
 const ZALO_CONFIG = {
@@ -164,15 +169,16 @@ export async function POST(req: Request) {
     if (itemsError) throw itemsError;
 
     // ==================================================================
-    // 🔥 GỬI THÔNG BÁO (ĐÃ NÂNG CẤP TỰ ĐỘNG GIA HẠN TOKEN)
+    // 🔥 GỬI THÔNG BÁO (ĐÃ BẬT LOGIC GỬI EMAIL)
     // ==================================================================
     (async () => {
       try {
         const orderId = orderData.id;
         const totalStr = finalAmount.toLocaleString("vi-VN");
 
-        // 1. GỬI EMAIL (GIỮ NGUYÊN)
-        if (EMAIL_CONFIG.user && EMAIL_CONFIG.pass) {
+        // 1. GỬI EMAIL (Sẽ hoạt động khi bạn điền đúng EMAIL_CONFIG ở trên)
+        if (EMAIL_CONFIG.user && EMAIL_CONFIG.pass && !EMAIL_CONFIG.user.includes("[THAY-DONG-NAY")) {
+          console.log("🚀 Đang gửi Email báo đơn hàng...");
           const transporter = nodemailer.createTransport({
             service: "gmail",
             auth: { user: EMAIL_CONFIG.user, pass: EMAIL_CONFIG.pass },
@@ -191,39 +197,47 @@ export async function POST(req: Request) {
           }
 
           const mailOptions = {
-            from: `"Hệ thống Đơn hàng" <${EMAIL_CONFIG.user}>`,
+            from: `"Nhà thuốc Thiên Hậu" <${EMAIL_CONFIG.user}>`,
             to: EMAIL_CONFIG.staffEmail,
-            subject: `🔔 Đơn mới #${orderId} - ${name} - ${totalStr}đ`,
+            subject: `🔔 ĐƠN MỚI #${orderId} - Khách: ${name} - Giá trị: ${totalStr}đ`,
             html: `
-                    <h2>CÓ ĐƠN HÀNG MỚI!</h2>
-                    <p><b>Mã đơn:</b> #${orderId}</p>
-                    <p><b>Khách hàng:</b> ${name}</p>
-                    <p><b>SĐT:</b> <a href="tel:${phone}">${phone}</a></p>
-                    <p><b>Địa chỉ:</b> ${address}</p>
-                    <p><b>Ghi chú:</b> ${note || "Không có"}</p>
-                    <p><b>Thanh toán:</b> ${paymentMethod}</p>
-                    <hr/>
-                    <h3>Chi tiết:</h3>
-                    <ul>${itemsHtml}</ul>
-                    <p>Giá gốc: ${serverSubTotal.toLocaleString()}đ</p>
-                    ${couponHtml}
-                    <h3>TỔNG THANH TOÁN: <span style="color:red">${totalStr} đ</span></h3>
-                    <p><i>Vui lòng gọi khách xác nhận ngay!</i></p>
+              <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 8px; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">📦 CÓ ĐƠN HÀNG MỚI!</h2>
+                
+                <p><b>Mã đơn hàng:</b> #${orderId}</p>
+                <p><b>Khách hàng:</b> ${name}</p>
+                <p><b>Điện thoại:</b> <a href="tel:${phone}" style="color: #d97706; font-weight: bold; text-decoration: none;">${phone}</a></p>
+                <p><b>Địa chỉ nhận hàng:</b> ${address}</p>
+                <p><b>Phương thức thanh toán:</b> ${paymentMethod}</p>
+                <p><b>Ghi chú của khách:</b> <i>${note || "Không có"}</i></p>
+                
+                <h3 style="background-color: #f3f4f6; padding: 10px; margin-top: 20px;">🛒 Chi tiết sản phẩm:</h3>
+                <ul style="line-height: 1.6;">${itemsHtml}</ul>
+                
+                <p>Giá gốc: ${serverSubTotal.toLocaleString()}đ</p>
+                ${couponHtml}
+                
+                <h3 style="color: #dc2626; font-size: 20px; border-top: 1px dashed #ccc; padding-top: 15px;">
+                  TỔNG THU: ${totalStr} VNĐ
+                </h3>
+                
+                <p style="color: #4b5563; font-style: italic; margin-top: 20px;">Vui lòng kiểm tra và liên hệ khách hàng để xác nhận đơn!</p>
+              </div>
                 `,
           };
 
           await transporter.sendMail(mailOptions);
+          console.log("✅ Gửi Email thành công!");
+        } else {
+           console.log("⚠️ Bỏ qua gửi Email vì chưa điền Cấu hình.");
         }
 
-        // 2. GỬI TIN NHẮN ZALO ZNS (LOGIC MỚI: DÙNG REFRESH TOKEN)
+        // 2. GỬI TIN NHẮN ZALO ZNS (GIỮ NGUYÊN)
         if (ZALO_CONFIG.refreshToken && phone) {
             if (ZALO_CONFIG.templateId === "ID_MAU_TIN_ZNS_CUA_BAN") {
                  console.log("⚠️ CHƯA GỬI ZALO: Bạn chưa điền Template ID.");
             } else {
                  console.log("🚀 Đang xử lý Zalo ZNS...");
-                 
-                 // --- BƯỚC A: LẤY ACCESS TOKEN MỚI TỪ REFRESH TOKEN ---
-                 // (Giúp hệ thống chạy được 3 tháng thay vì 1 ngày)
                  let newAccessToken = "";
                  try {
                      const tokenRes = await fetch("https://oauth.zaloapp.com/v4/oa/access_token", {
@@ -241,15 +255,12 @@ export async function POST(req: Request) {
                      const tokenData = await tokenRes.json();
                      if (tokenData.access_token) {
                          newAccessToken = tokenData.access_token;
-                         console.log("✅ Đã làm mới Access Token thành công!");
-                     } else {
-                         console.error("❌ Lỗi lấy Token mới:", tokenData);
+                         console.log("✅ Đã làm mới Access Token Zalo thành công!");
                      }
                  } catch (tokenErr) {
                      console.error("❌ Lỗi kết nối Zalo Auth:", tokenErr);
                  }
 
-                 // --- BƯỚC B: GỬI TIN NHẮN (NẾU CÓ TOKEN) ---
                  if (newAccessToken) {
                      let zaloPhone = phone.trim();
                      if (zaloPhone.startsWith("0")) zaloPhone = "84" + zaloPhone.substring(1);
@@ -259,7 +270,7 @@ export async function POST(req: Request) {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
-                            "access_token": newAccessToken // Dùng token vừa lấy
+                            "access_token": newAccessToken 
                         },
                         body: JSON.stringify({
                             phone: zaloPhone,
@@ -275,11 +286,7 @@ export async function POST(req: Request) {
                      });
 
                      const znsData = await znsRes.json();
-                     if (znsData.error !== 0) {
-                         console.error("❌ Lỗi gửi ZNS:", znsData);
-                     } else {
-                         console.log("✅ Gửi ZNS thành công!");
-                     }
+                     if (znsData.error !== 0) console.error("❌ Lỗi gửi ZNS:", znsData);
                  }
             }
         }
@@ -289,7 +296,7 @@ export async function POST(req: Request) {
       }
     })();
 
-    // --- BƯỚC 3: TRẢ LINK THANH TOÁN (GIỮ NGUYÊN) ---
+    // --- BƯỚC 3: TRẢ LINK THANH TOÁN (ĐÃ THÊM PAYOS) ---
     let paymentUrl = "";
     const orderId = orderData.id;
     const orderInfo = `Thanh toan don #${orderId}`;
@@ -301,25 +308,14 @@ export async function POST(req: Request) {
       case "VNPAY":
       case "ATM":
       case "VISA":
-        paymentUrl = createVNPayUrl({
-          orderId,
-          amount: amountToPay,
-          orderInfo,
-        });
+        paymentUrl = createVNPayUrl({ orderId, amount: amountToPay, orderInfo });
         break;
       case "MOMO":
-        paymentUrl = await createMoMoUrl({
-          orderId,
-          amount: amountToPay,
-          orderInfo,
-        });
+        paymentUrl = await createMoMoUrl({ orderId, amount: amountToPay, orderInfo });
         break;
       case "BANK":
-        const payOSData = await createPayOSLink({
-          orderId: Number(orderId),
-          amount: amountToPay,
-          description: orderInfo,
-        });
+      case "PAYOS":
+        const payOSData = await createPayOSLink({ orderId: Number(orderId), amount: amountToPay, description: orderInfo });
         paymentUrl = payOSData.checkoutUrl;
         break;
       default:

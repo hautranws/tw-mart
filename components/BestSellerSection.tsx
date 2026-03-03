@@ -1,7 +1,8 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import ProductCard from "./ProductCard"; // Dùng lại card sản phẩm cũ của bạn
+// --- [ĐÃ SỬA] Gọi đích danh component chuẩn từ thư mục components ---
+import ProductCard from "@/components/ProductCard";
 import Link from "next/link";
 
 export default function BestSellerSection() {
@@ -26,25 +27,30 @@ export default function BestSellerSection() {
     fetchBestSellers();
   }, []);
 
-  if (loading) return <div className="h-40 bg-gray-100 animate-pulse rounded-xl my-8"></div>;
+  if (loading)
+    return (
+      <div className="h-40 bg-gray-100 animate-pulse rounded-xl my-8"></div>
+    );
   if (products.length === 0) return null; // Không có sản phẩm thì ẩn luôn
 
   return (
     <div className="container mx-auto px-4 my-8">
       {/* Khung màu xanh giống Long Châu */}
       <div className="bg-blue-600 rounded-2xl p-6 shadow-lg relative overflow-hidden">
-        
         {/* Tiêu đề */}
         <div className="flex justify-center mb-6 relative z-10">
-           <div className="bg-red-600 text-white font-bold px-8 py-2 rounded-full text-lg shadow-md uppercase tracking-wide">
-              Sản phẩm bán chạy
-           </div>
+          <div className="bg-red-600 text-white font-bold px-8 py-2 rounded-full text-lg shadow-md uppercase tracking-wide">
+            Sản phẩm bán chạy
+          </div>
         </div>
 
         {/* Danh sách sản phẩm dạng lướt ngang (Scroll) */}
         <div className="flex overflow-x-auto gap-4 pb-4 scrollbar-hide -mx-2 px-2">
           {products.map((product) => (
-            <div key={product.id} className="min-w-[200px] md:min-w-[220px] max-w-[220px]">
+            <div
+              key={product.id}
+              className="min-w-[200px] md:min-w-[220px] max-w-[220px]"
+            >
               <ProductCard product={product} />
             </div>
           ))}
@@ -52,9 +58,13 @@ export default function BestSellerSection() {
 
         {/* Nút xem thêm (Tùy chọn) */}
         <div className="flex justify-center mt-4">
-            <Link href="/products" className="bg-white/20 hover:bg-white/30 text-white px-6 py-2 rounded-full text-sm backdrop-blur-sm transition">
-                Xem tất cả &rarr;
-            </Link>
+          {/* --- [ĐÃ SỬA] Đổi link tạm về trang chủ (hoặc bạn có thể đổi thành trang danh mục) để không bị 404 --- */}
+          <Link
+            href="/"
+            className="bg-white/20 hover:bg-white/30 text-white px-6 py-2 rounded-full text-sm backdrop-blur-sm transition"
+          >
+            Xem tất cả &rarr;
+          </Link>
         </div>
 
         {/* Hình nền trang trí (nếu thích) */}
