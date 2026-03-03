@@ -75,7 +75,7 @@ export default function CheckoutPage() {
       return lowerCity.includes("hồ chí minh") || lowerCity.includes("hcm") || lowerCity.includes("sài gòn");
   }, [currentCityName]);
 
-  // --- LOGIC PHÍ SHIP CHUẨN SHOPEE ---
+  // --- [MỚI] LOGIC PHÍ SHIP CHUẨN SHOPEE ---
   const shippingFee = useMemo(() => {
       if (deliveryMethod === 'store') return 0;
       // Đơn >= 50k là Freeship
@@ -170,10 +170,10 @@ export default function CheckoutPage() {
       if (currentCityName) {
           const lowerCity = currentCityName.toLowerCase();
           const today = new Date();
-          let minDays = 3, maxDays = 5; // Mặc định tỉnh xa là 3-5 ngày
+          let minDays = 3, maxDays = 5;
 
           if (isHCMC) {
-              minDays = 1; maxDays = 3; // HCM 1-3 ngày
+              minDays = 1; maxDays = 3;
           }
           else if (lowerCity.includes("long an") || lowerCity.includes("tiền giang") || lowerCity.includes("cần thơ") || lowerCity.includes("bình dương") || lowerCity.includes("đồng nai")) {
               minDays = 2; maxDays = 3;
@@ -219,7 +219,6 @@ export default function CheckoutPage() {
 
   const finalAmount = subTotal - discountAmount + shippingFee;
 
-  // Function Check Coupon thủ công (nếu khách tự nhập mã riêng)
   const checkCoupon = async (codeOverride?: string) => {
     setCouponMessage({ type: "", text: "" }); setCheckingCoupon(true);
     const codeToTest = (codeOverride || couponCode).toUpperCase().trim();
@@ -243,8 +242,7 @@ export default function CheckoutPage() {
     } catch (err) { console.error(err); } finally { setCheckingCoupon(false); }
   };
 
-  // --- [MỚI] LOGIC TỰ ĐỘNG CHỌN MÃ GIẢM GIÁ TỐT NHẤT ---
-  // Tìm mã mang lại mức giảm lớn nhất cho khách hàng
+  // --- LOGIC TỰ ĐỘNG CHỌN MÃ GIẢM GIÁ TỐT NHẤT ---
   const bestCouponId = useMemo(() => {
       let bestId = null;
       let maxD = 0;
@@ -277,19 +275,19 @@ export default function CheckoutPage() {
       let currentD = 0;
       let currentValid = false;
       if (appliedCoupon) {
-          if (subTotal >= appliedCoupon.min_order_value) {
+          if (subTotal >= (appliedCoupon as any).min_order_value) {
               currentValid = true;
-              currentD = appliedCoupon.discount_type === 'percent' ? (subTotal * appliedCoupon.discount_value) / 100 : appliedCoupon.discount_value;
-              if (appliedCoupon.max_discount_amount > 0 && currentD > appliedCoupon.max_discount_amount) currentD = appliedCoupon.max_discount_amount;
+              currentD = (appliedCoupon as any).discount_type === 'percent' ? (subTotal * (appliedCoupon as any).discount_value) / 100 : (appliedCoupon as any).discount_value;
+              if ((appliedCoupon as any).max_discount_amount > 0 && currentD > (appliedCoupon as any).max_discount_amount) currentD = (appliedCoupon as any).max_discount_amount;
               if (currentD > subTotal) currentD = subTotal;
           }
       }
 
-      // Tự động áp dụng nếu tìm thấy mã Tốt hơn mã hiện tại, hoặc đang không có mã
+      // [SỬA LỖI BUILD]: Ép kiểu (as any) để tránh lỗi 'never'
       if (best && maxD > currentD) {
-          if (appliedCoupon?.id !== best.id || discountAmount !== maxD) {
+          if ((appliedCoupon as any)?.id !== (best as any).id || discountAmount !== maxD) {
               setAppliedCoupon(best);
-              setCouponCode(best.code);
+              setCouponCode((best as any).code);
               setDiscountAmount(maxD);
               setCouponMessage({ type: "success", text: `✅ Đã tự động áp dụng mã ưu đãi lớn nhất: -${maxD.toLocaleString("vi-VN")}đ` });
           }
@@ -339,7 +337,7 @@ export default function CheckoutPage() {
           items: itemsToOrder, 
           totalAmount: finalAmount, 
           subTotal: subTotal, 
-          couponCode: appliedCoupon ? appliedCoupon.code : null, 
+          couponCode: appliedCoupon ? (appliedCoupon as any).code : null, 
           customer: orderInfo, 
           paymentMethod: paymentMethod,
           userId: user?.id 
@@ -491,7 +489,6 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                {/* --- [SỬA] KHU VỰC HIỂN THỊ MÃ GIẢM GIÁ --- */}
                 <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-dashed border-blue-300">
                   <div className="flex gap-2 mb-2">
                     <input type="text" placeholder="Nhập mã giảm giá..." className="flex-1 p-2 border rounded font-bold uppercase outline-none focus:ring-2 focus:ring-blue-400" value={couponCode || ""} onChange={(e) => setCouponCode(e.target.value)} />
@@ -506,14 +503,13 @@ export default function CheckoutPage() {
                         <div className="space-y-3">
                             {availableCoupons.map((c) => {
                                 const isBest = c.id === bestCouponId;
-                                const isApplied = appliedCoupon?.id === c.id;
+                                const isApplied = (appliedCoupon as any)?.id === c.id;
                                 
                                 return (
                                     <div key={c.id} className={`flex flex-col p-3 rounded-lg border transition-all ${isApplied ? 'border-blue-500 bg-blue-50 shadow-md' : 'bg-white border-gray-200 shadow-sm hover:border-blue-300'}`}>
                                         <div className="flex justify-between items-start mb-1">
                                             <div className="flex items-center gap-2">
                                                 <span className="font-bold text-blue-800 text-base">{c.code}</span>
-                                                {/* NHÃN ĐỎ CHO MÃ TỐT NHẤT */}
                                                 {isBest && <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">🔥 Tốt nhất</span>}
                                             </div>
                                             <button 
@@ -533,7 +529,6 @@ export default function CheckoutPage() {
                                             <p>Đơn tối thiểu: {(c.min_order_value).toLocaleString("vi-VN")}đ</p>
                                         </div>
                                         
-                                        {/* THÔNG BÁO MUA THÊM ĐỂ ĐƯỢC DÙNG MÃ */}
                                         {subTotal < c.min_order_value && (
                                             <div className="mt-2 pt-2 border-t border-gray-100">
                                                 <p className="text-red-500 text-[11px] font-medium flex items-center gap-1">
