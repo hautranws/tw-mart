@@ -18,13 +18,13 @@ import { supabase } from "@/lib/supabaseClient";
 const SERVICES = [
   {
     icon: <ShieldCheck className="w-8 h-8 text-blue-600" />,
-    title: "Nhà thuốc chính hãng",
-    desc: "Sở hữu danh mục thuốc chính hãng vừa đa dạng, phong phú lại vừa chuyên sâu.",
+    title: "Hàng xách tay chuẩn 100%",
+    desc: "Sở hữu danh mục hàng nội địa Đài Loan vừa đa dạng, phong phú, bay air liên tục.",
   },
   {
     icon: <Stethoscope className="w-8 h-8 text-blue-600" />,
-    title: "Dược sĩ tư vấn tại chỗ",
-    desc: "Với kinh nghiệm và chuyên môn cao với 4 tiêu chí: đúng thuốc, đúng liều, đúng cách và đúng giá.",
+    title: "Chuyên viên tư vấn am hiểu",
+    desc: "Tư vấn nhiệt tình, hỗ trợ tìm kiếm và order hàng theo yêu cầu nhanh chóng.",
   },
   {
     icon: <Truck className="w-8 h-8 text-blue-600" />,
@@ -53,10 +53,10 @@ export default function StoreSystemPage() {
   useEffect(() => {
     const fetchStores = async () => {
       const { data, error } = await supabase
-        .from('stores')
-        .select('*')
-        .eq('is_active', true);
-      
+        .from("stores")
+        .select("*")
+        .eq("is_active", true);
+
       if (data) {
         setAllStores(data);
         setDisplayStores(data);
@@ -72,12 +72,15 @@ export default function StoreSystemPage() {
         const matchName =
           store.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
           store.name.toLowerCase().includes(searchTerm.toLowerCase());
-        
+
         // Logic lọc tỉnh: Nếu chọn HCM thì lọc theo city_code 79 hoặc tên tỉnh
         const matchProvince =
-          selectedProvince === "Tất cả" || 
-          (selectedProvince === "TP.HCM" && (store.city_code === "79" || store.address.includes("Hồ Chí Minh") || store.address.includes("HCM")));
-        
+          selectedProvince === "Tất cả" ||
+          (selectedProvince === "TP.HCM" &&
+            (store.city_code === "79" ||
+              store.address.includes("Hồ Chí Minh") ||
+              store.address.includes("HCM")));
+
         return matchName && matchProvince;
       });
       setDisplayStores(filtered);
@@ -85,7 +88,12 @@ export default function StoreSystemPage() {
   }, [searchTerm, selectedProvince, activeTab, allStores]);
 
   // 3. LOGIC TÍNH KHOẢNG CÁCH
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const calculateDistance = (
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number,
+  ) => {
     const R = 6371;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
@@ -111,11 +119,18 @@ export default function StoreSystemPage() {
         const storesWithDistance = allStores.map((store) => {
           // Nếu DB chưa có lat/lng thì cho khoảng cách cực lớn
           if (!store.lat || !store.lng) return { ...store, distance: 99999 };
-          
-          const dist = calculateDistance(latitude, longitude, store.lat, store.lng);
+
+          const dist = calculateDistance(
+            latitude,
+            longitude,
+            store.lat,
+            store.lng,
+          );
           return { ...store, distance: dist };
         });
-        const sortedStores = storesWithDistance.sort((a, b) => a.distance - b.distance);
+        const sortedStores = storesWithDistance.sort(
+          (a, b) => a.distance - b.distance,
+        );
         setDisplayStores(sortedStores);
 
         if (sortedStores.length > 0) setSelectedStore(sortedStores[0]);
@@ -124,7 +139,7 @@ export default function StoreSystemPage() {
         console.error("Lỗi định vị:", error);
         setShowLocationPopup(true);
         setActiveTab("search");
-      }
+      },
     );
   };
 
@@ -133,11 +148,11 @@ export default function StoreSystemPage() {
       <div className="bg-blue-800 text-white py-8">
         <div className="container mx-auto px-4">
           <h1 className="text-2xl md:text-3xl font-bold mb-2">
-            Hệ thống nhà thuốc trên toàn quốc
+            Hệ thống cửa hàng và kho hàng
           </h1>
           <p className="opacity-90">
             Thời gian hoạt động: 6:00 - 22:00 hàng ngày (Thay đổi tùy theo từng
-            nhà thuốc)
+            cửa hàng)
           </p>
         </div>
       </div>
@@ -150,13 +165,13 @@ export default function StoreSystemPage() {
               onClick={() => setActiveTab("search")}
               className={`flex-1 py-2 font-bold transition-colors ${activeTab === "search" ? "text-blue-700 border-b-2 border-blue-700" : "text-gray-500 hover:text-blue-600"}`}
             >
-              Tìm kiếm nhà thuốc
+              Tìm kiếm cửa hàng
             </button>
             <button
               onClick={handleNearMeClick}
               className={`flex-1 py-2 font-bold transition-colors ${activeTab === "near_me" ? "text-blue-700 border-b-2 border-blue-700" : "text-gray-500 hover:text-blue-600"}`}
             >
-              Nhà thuốc gần bạn
+              Cửa hàng gần bạn
             </button>
           </div>
 
@@ -200,7 +215,7 @@ export default function StoreSystemPage() {
           <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1 custom-scrollbar">
             {activeTab === "search" && (
               <h3 className="font-bold text-sm text-gray-700">
-                Nhà thuốc gợi ý ({displayStores.length})
+                Cửa hàng gợi ý ({displayStores.length})
               </h3>
             )}
 
@@ -246,7 +261,7 @@ export default function StoreSystemPage() {
 
             {displayStores.length === 0 && (
               <div className="text-center text-sm text-gray-500 py-4">
-                Không tìm thấy nhà thuốc nào.
+                Không tìm thấy cửa hàng nào.
               </div>
             )}
           </div>
@@ -255,7 +270,7 @@ export default function StoreSystemPage() {
         {/* === CỘT PHẢI: HIỂN THỊ CHI TIẾT HOẶC GIỚI THIỆU === */}
         <div className="w-full md:w-2/3">
           {selectedStore ? (
-            // 👉 GIAO DIỆN CHI TIẾT NHÀ THUỐC
+            // 👉 GIAO DIỆN CHI TIẾT CỬA HÀNG
             <div className="bg-white p-6 rounded-xl shadow-sm h-full animate-fade-in">
               <h2 className="text-xl font-bold text-gray-800 mb-4 pb-4 border-b border-gray-100">
                 {selectedStore.name}
@@ -270,10 +285,16 @@ export default function StoreSystemPage() {
                     style={{ border: 0 }}
                     loading="lazy"
                     allowFullScreen
-                    src={selectedStore.map_url || `https://maps.google.com/maps?q=${encodeURIComponent(selectedStore.address)}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+                    src={
+                      selectedStore.map_url ||
+                      `https://maps.google.com/maps?q=${encodeURIComponent(selectedStore.address)}&t=&z=15&ie=UTF8&iwloc=&output=embed`
+                    }
                   ></iframe>
                   <a
-                    href={selectedStore.map_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedStore.address)}`}
+                    href={
+                      selectedStore.map_url ||
+                      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedStore.address)}`
+                    }
                     target="_blank"
                     rel="noreferrer"
                     className="absolute bottom-2 left-2 bg-white px-3 py-1 text-xs font-bold text-blue-600 rounded shadow hover:bg-blue-50"
@@ -286,9 +307,13 @@ export default function StoreSystemPage() {
                 <div className="w-full md:w-1/2 flex flex-col gap-4">
                   {/* Nếu có ảnh thì hiện ảnh nhỏ ở đây */}
                   {selectedStore.image_url && (
-                      <div className="h-32 w-full rounded-lg overflow-hidden border">
-                          <img src={selectedStore.image_url} className="w-full h-full object-cover" alt="Store Image" />
-                      </div>
+                    <div className="h-32 w-full rounded-lg overflow-hidden border">
+                      <img
+                        src={selectedStore.image_url}
+                        className="w-full h-full object-cover"
+                        alt="Store Image"
+                      />
+                    </div>
                   )}
 
                   <div>
@@ -321,7 +346,10 @@ export default function StoreSystemPage() {
 
                   <div className="mt-auto flex gap-3 pt-4">
                     <a
-                      href={selectedStore.map_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedStore.address)}`}
+                      href={
+                        selectedStore.map_url ||
+                        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedStore.address)}`
+                      }
                       target="_blank"
                       className="flex-1 bg-blue-700 hover:bg-blue-800 text-white font-bold py-2 rounded-full text-center transition flex items-center justify-center gap-2"
                     >
@@ -339,7 +367,7 @@ export default function StoreSystemPage() {
 
               <div className="mt-8 pt-6 border-t border-gray-100">
                 <h3 className="font-bold text-gray-800 mb-3">
-                  Dịch vụ tại nhà thuốc này:
+                  Dịch vụ tại cửa hàng này:
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   {SERVICES.map((s, i) => (
@@ -358,8 +386,7 @@ export default function StoreSystemPage() {
             // 👉 GIAO DIỆN MẶC ĐỊNH (KHI CHƯA CHỌN)
             <div className="bg-white p-6 rounded-xl shadow-sm h-full">
               <h2 className="text-lg font-bold text-gray-800 mb-4">
-                Thiên Hậu là hệ thống nhà thuốc bán lẻ & phân phối uy tín tại
-                TP.HCM.
+                TW MART chuyên hàng nội địa xách tay Đài Loan uy tín tại TP.HCM.
               </h2>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -379,26 +406,26 @@ export default function StoreSystemPage() {
               </div>
 
               <h3 className="font-bold text-gray-800 mb-4">
-                Hình ảnh nhận dạng hệ thống nhà thuốc Thiên Hậu:
+                Hình ảnh hệ thống cửa hàng / kho hàng TW MART:
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <img
-                  src="https://nhathuoclongchau.com.vn/estore-images/store/4862/1.jpg"
+                  src="https://via.placeholder.com/400x300.png?text=Kho+TW+MART+1"
                   className="rounded-lg h-32 w-full object-cover"
                   alt="Store 1"
                 />
                 <img
-                  src="https://nhathuoclongchau.com.vn/estore-images/store/4862/2.jpg"
+                  src="https://via.placeholder.com/400x300.png?text=Kho+TW+MART+2"
                   className="rounded-lg h-32 w-full object-cover"
                   alt="Store 2"
                 />
                 <img
-                  src="https://nhathuoclongchau.com.vn/estore-images/store/4862/3.jpg"
+                  src="https://via.placeholder.com/400x300.png?text=Kho+TW+MART+3"
                   className="rounded-lg h-32 w-full object-cover"
                   alt="Store 3"
                 />
                 <img
-                  src="https://nhathuoclongchau.com.vn/estore-images/store/4862/4.jpg"
+                  src="https://via.placeholder.com/400x300.png?text=Kho+TW+MART+4"
                   className="rounded-lg h-32 w-full object-cover"
                   alt="Store 4"
                 />

@@ -3,7 +3,16 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { TOP_SEARCHES } from "./constants";
+
+// 👇 ĐÃ THÊM: Danh sách từ khóa xách tay Đài Loan của shop bạn
+const HOT_KEYWORDS = [
+  "Dầu Metholanum",
+  "Green Oil",
+  "Cao dán Kim Môn",
+  "Dầu xoa bóp Chinpai",
+  "Vaseline 600ml",
+  "Mặt nạ"
+];
 
 export default function SearchBar() {
   const router = useRouter();
@@ -86,16 +95,13 @@ export default function SearchBar() {
     if (e.key === "Enter") handleSearch();
   };
 
-  // --- MỚI: HÀM XỬ LÝ ẢNH THÔNG MINH ---
   const getProductImage = (imgData: any) => {
-    if (!imgData) return null; // Không có ảnh
+    if (!imgData) return null; 
     try {
-      // Nếu là chuỗi JSON mảng (Kiểu mới) -> Lấy ảnh đầu tiên
       if (imgData.startsWith("[")) {
         const parsed = JSON.parse(imgData);
         return parsed[0];
       }
-      // Nếu là link thường (Kiểu cũ) -> Trả về nguyên gốc
       return imgData;
     } catch {
       return imgData;
@@ -105,14 +111,13 @@ export default function SearchBar() {
   return (
     <div
       ref={searchContainerRef}
-      // 1. TĂNG ĐỘ RỘNG Ở ĐÂY: max-w-xl -> max-w-3xl
       className="hidden md:block flex-1 max-w-3xl mx-4 relative"
     >
       <div className="relative w-full">
         <input
           type="text"
-          placeholder="Tìm tên thuốc, bệnh lý..."
-          // 👇 ĐÃ THÊM: border border-black để tạo viền đen
+          // 👇 ĐÃ SỬA: Đổi chữ mờ (Placeholder) cho chuẩn hàng tiêu dùng
+          placeholder="Tìm tên sản phẩm, thương hiệu, công dụng..."
           className="w-full py-3 px-6 rounded-full text-black outline-none shadow-lg bg-white text-base border border-black"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -129,7 +134,6 @@ export default function SearchBar() {
 
       {showSuggestions && (
         <div className="absolute top-full mt-2 left-0 w-full bg-white rounded-lg shadow-2xl border border-gray-100 overflow-hidden z-[100] animate-fade-in text-gray-800">
-          {/* Lịch sử */}
           {searchTerm.length < 2 && searchHistory.length > 0 && (
             <div className="border-b border-gray-100">
               <div className="flex justify-between items-center bg-gray-50 px-4 py-2">
@@ -166,14 +170,14 @@ export default function SearchBar() {
             </div>
           )}
 
-          {/* Tra cứu hàng đầu (Trong popup) */}
           {searchTerm.length < 2 && (
             <div className="p-4 bg-white">
               <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
                 Tra cứu hàng đầu
               </div>
               <div className="flex flex-wrap gap-2">
-                {TOP_SEARCHES.map((tag, index) => (
+                {/* 👇 ĐÃ SỬA: Map theo list HOT_KEYWORDS mới */}
+                {HOT_KEYWORDS.map((tag, index) => (
                   <button
                     key={index}
                     onClick={() => handleHistoryClick(tag)}
@@ -186,7 +190,6 @@ export default function SearchBar() {
             </div>
           )}
 
-          {/* Gợi ý sản phẩm */}
           {searchTerm.length > 1 && suggestions.length > 0 && (
             <div>
               <div className="bg-gray-50 px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wide border-b">
@@ -194,9 +197,7 @@ export default function SearchBar() {
               </div>
               <div className="max-h-[400px] overflow-y-auto">
                 {suggestions.map((product) => {
-                   // Sử dụng hàm xử lý ảnh mới ở đây
                    const displayImg = getProductImage(product.img);
-                   
                    return (
                       <Link
                         key={product.id}
@@ -254,9 +255,9 @@ export default function SearchBar() {
         </div>
       )}
 
-      {/* 👇 ĐÃ SỬA: Đổi màu chữ thành text-black và hover thành màu xanh */}
       <div className="flex items-center gap-4 mt-3 overflow-x-auto whitespace-nowrap text-sm text-black font-medium hide-scrollbar">
-        {TOP_SEARCHES.map((tag, index) => (
+        {/* 👇 ĐÃ SỬA: Map theo list HOT_KEYWORDS mới ở dưới thanh tìm kiếm */}
+        {HOT_KEYWORDS.map((tag, index) => (
           <button
             key={index}
             onClick={() => handleHistoryClick(tag)}

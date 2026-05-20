@@ -10,8 +10,8 @@ import LiveChat from "@/components/LiveChat";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Nhà Thuốc Thiên Hậu",
-  description: "Hệ thống nhà thuốc chính hãng",
+  title: "TW MART - Siêu thị Đài Loan",
+  description: "Hệ thống hàng Đài Loan chính hãng",
 };
 
 export default function RootLayout({
@@ -25,7 +25,7 @@ export default function RootLayout({
         {/* CartProvider bọc toàn bộ nội dung để chia sẻ dữ liệu Giỏ hàng */}
         <CartProvider>
           <Header />
-          
+
           {children}
 
           <LiveChat />

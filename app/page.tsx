@@ -7,31 +7,29 @@ import CategoryGrid from "@/components/CategoryGrid";
 import ProductCard from "@/components/ProductCard";
 import BestSellerSection from "@/components/BestSellerSection";
 
-// 👇 [QUAN TRỌNG] THÊM DÒNG NÀY ĐỂ SỬA LỖI BUILD
-// Nó giúp trang web luôn lấy dữ liệu mới nhất và không bị lỗi khi deploy
+// 👇 LUÔN LẤY DỮ LIỆU MỚI NHẤT TỪ SUPABASE
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  // 1. Lấy tất cả sản phẩm
+  // 1. Lấy sản phẩm từ bảng Đài Loan (products_tw)
   const { data: products, error } = await supabase
-    .from("products")
+    .from("products_tw") // 👈 ĐÃ ĐỔI SANG BẢNG MỚI
     .select(
       "id, title, price, old_price, img, unit, is_best_seller, is_flash_sale, flash_sale_price",
     )
     .order("id", { ascending: false })
     .limit(20);
 
-  // 2. Lấy sản phẩm bán chạy
+  // 2. Lấy sản phẩm bán chạy từ bảng Đài Loan (products_tw)
   const { data: bestSellers } = await supabase
-    .from("products")
+    .from("products_tw") // 👈 ĐÃ ĐỔI SANG BẢNG MỚI
     .select("*")
     .eq("is_best_seller", true)
     .limit(10);
 
-  if (error) console.error("Lỗi lấy hàng:", error);
+  if (error) console.error("Lỗi lấy hàng từ products_tw:", error);
 
   return (
-    // --- [SỬA LẠI]: Đảm bảo là bg-white (trắng tinh) ---
     <div className="min-h-screen bg-white font-sans">
       <main className="container mx-auto p-4 pt-6">
         <div className="mb-8">
@@ -45,14 +43,13 @@ export default async function Home() {
         {/* --- GIAO DIỆN BÁN CHẠY --- */}
         <section className="mb-8">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gradient-to-r from-red-600 to-orange-500 text-white">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gradient-to-r from-red-600 to-blue-900 text-white">
               <div className="flex items-center gap-2">
                 <span className="text-2xl">🔥</span>
                 <h2 className="text-xl font-bold uppercase">
-                  Sản phẩm bán chạy
+                  Sản phẩm Đài Loan bán chạy
                 </h2>
               </div>
-              {/* --- ĐÃ SỬA: Đổi link tạm về trang chủ để không bị lỗi 404 --- */}
               <Link
                 href="/"
                 className="text-sm bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full transition"
@@ -64,7 +61,6 @@ export default async function Home() {
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-0 divide-x divide-y divide-gray-100">
               {bestSellers && bestSellers.length > 0 ? (
                 bestSellers.map((product) => (
-                  // --- [ĐÃ SỬA CHỖ NÀY] Đổi /san-pham/ thành /product/ ---
                   <Link
                     href={`/product/${product.id}`}
                     key={product.id}
@@ -97,23 +93,26 @@ export default async function Home() {
                       </div>
                     </div>
                     <div className="mt-3 w-full bg-blue-600 text-white text-center py-2 rounded-full font-bold text-xs opacity-0 group-hover:opacity-100 transition-opacity">
-                      Chọn mua
+                      Xem chi tiết
                     </div>
                   </Link>
                 ))
               ) : (
-                <div className="p-8 text-center text-gray-500 col-span-full">
-                  Chưa có sản phẩm bán chạy nào được chọn.
+                <div className="p-8 text-center text-gray-500 col-span-full italic">
+                  Chưa có sản phẩm Đài Loan nào trong danh sách bán chạy.
                 </div>
               )}
             </div>
           </div>
         </section>
 
-        <CategoryGrid />
+        {/* Ẩn danh mục nổi bật cũ */}
+        <div className="hidden">
+           <CategoryGrid />
+        </div>
 
-        <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-4 md:mb-6 border-l-4 border-blue-600 pl-4">
-          Sản phẩm từ kho hàng (Realtime)
+        <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-4 md:mb-6 border-l-4 border-red-600 pl-4">
+          Tất cả sản phẩm xách tay Đài Loan
         </h2>
 
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
@@ -122,8 +121,9 @@ export default async function Home() {
               <ProductCard key={product.id} product={product} />
             ))
           ) : (
-            <div className="col-span-2 md:col-span-4 text-center py-10 text-gray-500 bg-white rounded-lg">
-              <p>📭 Kho hàng đang trống hoặc chưa mở khóa RLS.</p>
+            <div className="col-span-full text-center py-20 text-gray-500 bg-gray-50 rounded-xl border-2 border-dashed">
+              <p className="text-lg">📦 Đang cập nhật hàng mới từ Đài Loan...</p>
+              <p className="text-sm italic">Vui lòng quay lại sau ít phút hoặc nhắn Zalo để đặt hàng sớm.</p>
             </div>
           )}
         </div>

@@ -42,19 +42,19 @@ export default function AdminBannerManager() {
       // 1. Tạo tên file duy nhất (tránh trùng tên)
       const fileName = `banner-${Date.now()}-${file.name.replace(
         /[^a-zA-Z0-9.]/g,
-        "_"
+        "_",
       )}`;
 
       // 2. Upload lên Supabase Storage (Bucket tên là "banners")
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("banners") // <--- Đảm bảo bạn đã tạo bucket này trên Supabase
+      const { error: uploadError } = await supabase.storage
+        .from("tw-mart-banners") // Đã đổi sang bucket mới
         .upload(fileName, file);
 
       if (uploadError) throw uploadError;
 
       // 3. Lấy link ảnh công khai (Public URL)
       const { data: publicUrlData } = supabase.storage
-        .from("banners")
+        .from("tw-mart-banners") // Đã đổi sang bucket mới
         .getPublicUrl(fileName);
 
       const finalUrl = publicUrlData.publicUrl;
@@ -71,7 +71,7 @@ export default function AdminBannerManager() {
     } catch (error: any) {
       console.error(error);
       alert(
-        "❌ Lỗi upload: " + (error.message || "Vui lòng kiểm tra lại Storage")
+        "❌ Lỗi upload: " + (error.message || "Vui lòng kiểm tra lại Storage"),
       );
     } finally {
       setUploading(false);

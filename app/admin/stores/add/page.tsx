@@ -47,26 +47,32 @@ export default function AddStorePage() {
       // 1. Upload ảnh nếu có
       if (imageFile) {
         const fileName = `${Date.now()}_${imageFile.name.replace(/[^a-zA-Z0-9]/g, "_")}`;
-        // Lưu ý: Bạn nhớ tạo bucket tên là 'stores' và bật Public nhé
-        const { error: uploadError } = await supabase.storage.from("stores").upload(fileName, imageFile);
-        
-        if (uploadError) throw new Error("Lỗi upload ảnh: " + uploadError.message);
-        
-        const { data: urlData } = supabase.storage.from("stores").getPublicUrl(fileName);
+        // Đã đổi sang bucket 'tw-mart-stores'
+        const { error: uploadError } = await supabase.storage
+          .from("tw-mart-stores")
+          .upload(fileName, imageFile);
+
+        if (uploadError)
+          throw new Error("Lỗi upload ảnh: " + uploadError.message);
+
+        const { data: urlData } = supabase.storage
+          .from("stores")
+          .getPublicUrl(fileName); // Lấy public URL từ bucket 'stores' (cần đổi thành 'tw-mart-stores' nếu bạn muốn URL cũng phản ánh bucket mới)
         uploadedImageUrl = urlData.publicUrl;
       }
 
       // 2. Lưu vào DB
-      const { error } = await supabase.from("stores").insert([{
-        ...formData,
-        image_url: uploadedImageUrl
-      }]);
+      const { error } = await supabase.from("stores").insert([
+        {
+          ...formData,
+          image_url: uploadedImageUrl,
+        },
+      ]);
 
       if (error) throw error;
 
-      alert("✅ Thêm nhà thuốc thành công!");
+      alert("✅ Thêm cửa hàng thành công!");
       router.push("/admin/stores");
-
     } catch (error: any) {
       alert("❌ Lỗi: " + error.message);
     } finally {
@@ -77,64 +83,137 @@ export default function AddStorePage() {
   return (
     <div className="min-h-screen bg-gray-100 p-8 flex justify-center">
       <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-2xl">
-        <h1 className="text-2xl font-bold text-blue-800 mb-6">🏥 Thêm Nhà Thuốc Mới</h1>
-        
+        <h1 className="text-2xl font-bold text-blue-800 mb-6">
+          🏪 Thêm Cửa Hàng Mới
+        </h1>
+
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Tên & SĐT */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-bold mb-1">Tên nhà thuốc (*)</label>
-              <input type="text" required className="w-full border p-3 rounded" placeholder="VD: Nhà thuốc Quận 1" 
-                value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+              <label className="block text-sm font-bold mb-1">
+                Tên cửa hàng (*)
+              </label>
+              <input
+                type="text"
+                required
+                className="w-full border p-3 rounded"
+                placeholder="VD: TW MART Quận 1"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+              />
             </div>
             <div>
-              <label className="block text-sm font-bold mb-1">Số điện thoại</label>
-              <input type="text" className="w-full border p-3 rounded" placeholder="090..." 
-                value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+              <label className="block text-sm font-bold mb-1">
+                Số điện thoại
+              </label>
+              <input
+                type="text"
+                className="w-full border p-3 rounded"
+                placeholder="090..."
+                value={formData.phone}
+                onChange={(e) =>
+                  setFormData({ ...formData, phone: e.target.value })
+                }
+              />
             </div>
           </div>
 
           {/* Chọn Tỉnh/Thành (Quan trọng để lấy City Code) */}
           <div>
-            <label className="block text-sm font-bold mb-1 text-red-600">Khu vực (Tỉnh/Thành) (*)</label>
-            <select required className="w-full border p-3 rounded bg-blue-50"
+            <label className="block text-sm font-bold mb-1 text-red-600">
+              Khu vực (Tỉnh/Thành) (*)
+            </label>
+            <select
+              required
+              className="w-full border p-3 rounded bg-blue-50"
               value={formData.city_code}
-              onChange={e => setFormData({...formData, city_code: e.target.value})}
+              onChange={(e) =>
+                setFormData({ ...formData, city_code: e.target.value })
+              }
             >
               <option value="">-- Chọn Tỉnh/Thành phố --</option>
               {cities.map((city: any) => (
-                <option key={city.code} value={city.code}>{city.name}</option>
+                <option key={city.code} value={city.code}>
+                  {city.name}
+                </option>
               ))}
             </select>
-            <p className="text-xs text-gray-500 mt-1">Chọn đúng tỉnh để liên kết với tính năng "Nhận tại cửa hàng" ở trang Checkout.</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Chọn đúng tỉnh để liên kết với tính năng "Nhận tại cửa hàng" ở
+              trang Checkout.
+            </p>
           </div>
 
           {/* Địa chỉ chi tiết */}
           <div>
-            <label className="block text-sm font-bold mb-1">Địa chỉ hiển thị (*)</label>
-            <input type="text" required className="w-full border p-3 rounded" placeholder="VD: 123 Lê Lợi, P. Bến Nghé..." 
-              value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
+            <label className="block text-sm font-bold mb-1">
+              Địa chỉ hiển thị (*)
+            </label>
+            <input
+              type="text"
+              required
+              className="w-full border p-3 rounded"
+              placeholder="VD: 123 Lê Lợi, P. Bến Nghé..."
+              value={formData.address}
+              onChange={(e) =>
+                setFormData({ ...formData, address: e.target.value })
+              }
+            />
           </div>
 
           {/* Google Map & Ảnh */}
           <div>
-            <label className="block text-sm font-bold mb-1">Link Google Map (Share Link)</label>
-            <input type="text" className="w-full border p-3 rounded" placeholder="https://maps.app.goo.gl/..." 
-              value={formData.map_url} onChange={e => setFormData({...formData, map_url: e.target.value})} />
+            <label className="block text-sm font-bold mb-1">
+              Link Google Map (Share Link)
+            </label>
+            <input
+              type="text"
+              className="w-full border p-3 rounded"
+              placeholder="https://maps.app.goo.gl/..."
+              value={formData.map_url}
+              onChange={(e) =>
+                setFormData({ ...formData, map_url: e.target.value })
+              }
+            />
           </div>
 
           <div className="border-2 border-dashed border-gray-300 p-4 rounded text-center">
             <label className="cursor-pointer block">
-              <span className="text-blue-600 font-bold block mb-2">📸 Tải ảnh nhà thuốc lên</span>
-              <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+              <span className="text-blue-600 font-bold block mb-2">
+                📸 Tải ảnh cửa hàng lên
+              </span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageChange}
+              />
             </label>
-            {previewUrl && <img src={previewUrl} alt="Preview" className="h-32 mx-auto object-cover rounded shadow" />}
+            {previewUrl && (
+              <img
+                src={previewUrl}
+                alt="Preview"
+                className="h-32 mx-auto object-cover rounded shadow"
+              />
+            )}
           </div>
 
           <div className="flex gap-4 pt-4">
-            <Link href="/admin/stores" className="flex-1 py-3 bg-gray-200 text-center rounded font-bold text-gray-700">Hủy</Link>
-            <button type="submit" disabled={loading} className="flex-1 py-3 bg-blue-600 text-white rounded font-bold hover:bg-blue-700">
-              {loading ? "Đang lưu..." : "Lưu Nhà Thuốc"}
+            <Link
+              href="/admin/stores"
+              className="flex-1 py-3 bg-gray-200 text-center rounded font-bold text-gray-700"
+            >
+              Hủy
+            </Link>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 py-3 bg-blue-600 text-white rounded font-bold hover:bg-blue-700"
+            >
+              {loading ? "Đang lưu..." : "Lưu Cửa Hàng"}
             </button>
           </div>
         </form>

@@ -78,7 +78,7 @@ export default function Header() {
                 title={item.title}
                 count={item.count}
               />
-            )
+            ),
           )}
         </div>
       </div>
@@ -103,13 +103,13 @@ export default function Header() {
             Hệ thống chính hãng
           </span>
           <span className="text-lg md:text-2xl tracking-tighter uppercase">
-            NHÀ THUỐC THIÊN HẬU
+            TW MART
           </span>
         </Link>
         <div className="hidden md:block flex-1 max-w-xl mx-4 relative">
           <input
             type="text"
-            placeholder="Tìm tên thuốc, bệnh lý..."
+            placeholder="Tìm sản phẩm, thương hiệu..."
             className="w-full py-2 px-4 rounded-full text-black outline-none shadow-lg"
           />
           <button className="absolute right-1 top-1 bottom-1 bg-blue-800 px-4 rounded-full hover:bg-blue-900">

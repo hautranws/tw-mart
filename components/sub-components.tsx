@@ -61,7 +61,7 @@ export const ProductCard = ({
         {img && img.startsWith("http") ? (
           <img src={img} className="h-full object-contain" alt={title} />
         ) : (
-          <span className="text-3xl">💊</span> // Icon mặc định nếu không có ảnh
+          <span className="text-3xl">📦</span> // Icon mặc định nếu không có ảnh
         )}
       </div>
       <p className="text-xs font-bold line-clamp-2 mb-1 text-gray-700 group-hover/prod:text-blue-700">

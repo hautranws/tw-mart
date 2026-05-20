@@ -11,7 +11,7 @@ import AdminBannerManager from "@/components/admin/AdminBannerManager";
 
 // CẤU HÌNH ADMIN
 const ADMIN_PHONE_CORE = "989217112";
-const ADMIN_EMAIL = "admin@thienhau.com";
+const ADMIN_EMAILS = ["admin@thienhau.com", "tranthienhaudau2@gmail.com"]; // Thêm email mới vào đây
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -54,7 +54,7 @@ export default function AdminDashboard() {
     const cleanPhone = userPhone.replace(/[^0-9]/g, "");
 
     const isPhoneMatch = cleanPhone.includes(ADMIN_PHONE_CORE);
-    const isEmailMatch = userEmail === ADMIN_EMAIL;
+    const isEmailMatch = ADMIN_EMAILS.includes(userEmail); // Kiểm tra email có trong danh sách admin không
 
     if (!isPhoneMatch && !isEmailMatch) {
       setAuthStatus("denied");
@@ -103,7 +103,7 @@ export default function AdminDashboard() {
       return;
     }
     router.push(
-      `/admin/stores/add?address=${encodeURIComponent(quickAddress)}`
+      `/admin/stores/add?address=${encodeURIComponent(quickAddress)}`,
     );
   };
 

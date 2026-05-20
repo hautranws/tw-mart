@@ -2,16 +2,14 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient"; // Import Supabase
 
 // Danh sách các ký tự bộ lọc
 const ALPHABET = ["#", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("")];
 
-export default function TraCuuThuocPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ alpha?: string }>;
-}) {
+export default function TraCuuThuocPage() {
+  const searchParams = useSearchParams();
   // --- STATE QUẢN LÝ DỮ LIỆU ---
   const [selectedChar, setSelectedChar] = useState("A"); // Mặc định chọn chữ A
   const [searchTerm, setSearchTerm] = useState("");
@@ -20,12 +18,10 @@ export default function TraCuuThuocPage({
 
   // --- 1. LẤY DỮ LIỆU TỪ URL (Nếu người dùng bấm từ Header vào) ---
   useEffect(() => {
-    // Xử lý Promise searchParams để lấy alpha
-    searchParams.then((params) => {
-      if (params.alpha) {
-        setSelectedChar(params.alpha);
-      }
-    });
+    const alpha = searchParams.get("alpha");
+    if (alpha) {
+      setSelectedChar(alpha);
+    }
   }, [searchParams]);
 
   // --- 2. HÀM GỌI DỮ LIỆU TỪ SUPABASE ---
@@ -65,7 +61,7 @@ export default function TraCuuThuocPage({
           .limit(50);
 
         if (error) {
-          console.error("Lỗi lấy thuốc:", error);
+          console.error("Lỗi lấy sản phẩm:", error);
         } else {
           setMedicines(data || []);
         }
@@ -92,7 +88,7 @@ export default function TraCuuThuocPage({
           Trang chủ
         </Link>
         <span className="mx-2">/</span>
-        <span className="text-gray-800 font-medium">Tra cứu thuốc</span>
+        <span className="text-gray-800 font-medium">Tra cứu sản phẩm</span>
       </div>
 
       <div className="container mx-auto px-4">
@@ -106,12 +102,12 @@ export default function TraCuuThuocPage({
 
           <div className="w-full md:w-2/3 z-10">
             <h1 className="text-2xl font-bold text-gray-800 mb-4">
-              Tra cứu thuốc chính hãng
+              Tra cứu hàng nội địa Đài Loan
             </h1>
             <div className="relative">
               <input
                 type="text"
-                placeholder="Nhập tên thuốc cần tìm..."
+                placeholder="Nhập tên sản phẩm cần tìm..."
                 className="w-full pl-5 pr-12 py-3 rounded-full border border-gray-300 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-sm text-gray-700"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -145,7 +141,7 @@ export default function TraCuuThuocPage({
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-100">
           <h2 className="text-lg font-bold text-gray-800 mb-4 border-l-4 border-blue-600 pl-3 flex justify-between items-center">
             <span>
-              Thuốc thông dụng theo vần:{" "}
+              Sản phẩm thông dụng theo vần:{" "}
               <span className="text-blue-600 text-2xl ml-1">
                 {selectedChar}
               </span>
@@ -221,7 +217,7 @@ export default function TraCuuThuocPage({
                             className="w-full h-full object-contain p-1"
                           />
                         ) : (
-                          <span className="text-2xl">💊</span>
+                          <span className="text-2xl">📦</span>
                         )}
                       </div>
 
@@ -239,7 +235,7 @@ export default function TraCuuThuocPage({
                           </span>
                         </p>
                         <p className="text-gray-500 text-xs mt-1 line-clamp-1">
-                          {drug.sub_category || "Thuốc chính hãng"}
+                          {drug.sub_category || "Hàng xách tay"}
                         </p>
                       </div>
                     </Link>
@@ -252,8 +248,8 @@ export default function TraCuuThuocPage({
                 <p className="text-4xl mb-3">📭</p>
                 <p>
                   {searchTerm
-                    ? `Không tìm thấy thuốc nào có tên "${searchTerm}"`
-                    : `Chưa có thuốc nào bắt đầu bằng vần "${
+                    ? `Không tìm thấy sản phẩm nào có tên "${searchTerm}"`
+                    : `Chưa có sản phẩm nào bắt đầu bằng vần "${
                         selectedChar === "#" ? "Số" : selectedChar
                       }"`}
                 </p>
@@ -269,17 +265,17 @@ export default function TraCuuThuocPage({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div className="bg-blue-600 text-white p-6 rounded-xl flex items-center justify-between cursor-pointer hover:bg-blue-700 transition shadow-md">
             <div>
-              <p className="font-bold text-lg">Tìm nhà thuốc</p>
-              <p className="text-sm opacity-90">Hệ thống Thiên Hậu toàn quốc</p>
+              <p className="font-bold text-lg">Tìm cửa hàng</p>
+              <p className="text-sm opacity-90">Hệ thống TW MART toàn quốc</p>
             </div>
-            <span className="text-3xl">🏥</span>
+            <span className="text-3xl">🏪</span>
           </div>
           <div className="bg-green-600 text-white p-6 rounded-xl flex items-center justify-between cursor-pointer hover:bg-green-700 transition shadow-md">
             <div>
-              <p className="font-bold text-lg">Tư vấn với Dược sĩ</p>
+              <p className="font-bold text-lg">Nhân viên hỗ trợ</p>
               <p className="text-sm opacity-90">Chat ngay để được hỗ trợ</p>
             </div>
-            <span className="text-3xl">👩‍⚕️</span>
+            <span className="text-3xl">👩‍💻</span>
           </div>
           <div className="bg-orange-500 text-white p-6 rounded-xl flex items-center justify-between cursor-pointer hover:bg-orange-600 transition shadow-md">
             <div>

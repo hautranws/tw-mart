@@ -23,7 +23,7 @@ const reviews = [
     date: "20/01/2024",
     rating: 5,
     content:
-      "Mua lần thứ 3 rồi, thuốc chất lượng, giá rẻ hơn tiệm thuốc tây gần nhà.",
+      "Mua lần thứ 3 rồi, hàng chuẩn, chất lượng, giá tốt hơn mua ở các shop khác.",
   },
 ];
 

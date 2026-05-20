@@ -3,9 +3,9 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
-// --- QUAN TRỌNG: PHẢI TRÙNG VỚI EMAIL BÊN FILE LOGIN ---
-const ADMIN_EMAIL = "admin@thienhau.com"; 
-// ------------------------------------------------------
+// CẤU HÌNH ADMIN (ĐỒNG BỘ VỚI /admin/page.tsx)
+const ADMIN_PHONE_CORE = "989217112";
+const ADMIN_EMAILS = ["admin@thienhau.com", "tranthienhaudau2@gmail.com"];
 
 export default function AdminLayout({
   children,
@@ -18,19 +18,27 @@ export default function AdminLayout({
   useEffect(() => {
     const checkUser = async () => {
       // 1. Lấy thông tin người đang đăng nhập
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
       if (!session) {
         // Chưa đăng nhập -> Đá về Login
         router.push("/login");
       } else {
-        // 2. KIỂM TRA EMAIL CÓ PHẢI ADMIN KHÔNG?
-        if (session.user.email === ADMIN_EMAIL) {
-            setAuthorized(true); // Đúng là Admin -> Cho vào
+        // 2. KIỂM TRA QUYỀN ADMIN (EMAIL HOẶC SĐT)
+        const userEmail = session.user.email || "";
+        const userPhone = session.user.phone || "";
+        const cleanPhone = userPhone.replace(/[^0-9]/g, "");
+
+        const isEmailMatch = ADMIN_EMAILS.includes(userEmail);
+        const isPhoneMatch = cleanPhone.includes(ADMIN_PHONE_CORE);
+
+        if (isEmailMatch || isPhoneMatch) {
+          setAuthorized(true); // Đúng là Admin -> Cho vào
         } else {
-            // Đã đăng nhập nhưng là KHÁCH HÀNG -> Đá về trang chủ
-            alert("Bạn không có quyền truy cập trang Quản trị!");
-            router.push("/"); 
+          alert("Bạn không có quyền truy cập trang Quản trị!");
+          router.push("/");
         }
       }
     };
@@ -39,7 +47,11 @@ export default function AdminLayout({
   }, [router]);
 
   if (!authorized) {
-    return <div className="min-h-screen flex items-center justify-center text-gray-500">Đang kiểm tra quyền Admin...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-500">
+        Đang kiểm tra quyền Admin...
+      </div>
+    );
   }
 
   return (
