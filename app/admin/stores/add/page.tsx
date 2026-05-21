@@ -56,8 +56,8 @@ export default function AddStorePage() {
           throw new Error("Lỗi upload ảnh: " + uploadError.message);
 
         const { data: urlData } = supabase.storage
-          .from("stores")
-          .getPublicUrl(fileName); // Lấy public URL từ bucket 'stores' (cần đổi thành 'tw-mart-stores' nếu bạn muốn URL cũng phản ánh bucket mới)
+          .from("tw-mart-stores") // Đã đổi sang bucket cho cửa hàng
+          .getPublicUrl(fileName);
         uploadedImageUrl = urlData.publicUrl;
       }
 

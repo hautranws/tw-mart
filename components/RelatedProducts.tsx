@@ -2,6 +2,17 @@ import React from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 
+// Helper function để lấy ảnh thumbnail từ chuỗi JSON
+const getThumbnail = (imgData: string | null) => {
+  if (!imgData) return "https://via.placeholder.com/150"; // Ảnh mặc định
+  try {
+    const parsed = JSON.parse(imgData);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : imgData;
+  } catch {
+    return imgData;
+  }
+};
+
 // Component này nhận vào Danh mục hiện tại và ID sản phẩm đang xem (để trừ nó ra)
 export default async function RelatedProducts({
   category,
@@ -34,22 +45,24 @@ export default async function RelatedProducts({
             href={`/product/${product.id}`}
             className="block group"
           >
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition h-full flex flex-col">
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:shadow-xl transition h-full flex flex-col group-hover:border-blue-200">
               {/* Ảnh */}
-              <div
-                className={`h-32 ${product.image_url} rounded-lg mb-3 flex items-center justify-center text-gray-400 bg-opacity-20`}
-              >
-                [Ảnh]
+              <div className="w-full aspect-square flex items-center justify-center overflow-hidden rounded-lg cursor-pointer mb-3 bg-gray-50">
+                <img
+                  src={getThumbnail(product.img)}
+                  alt={product.title}
+                  className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-300"
+                />
               </div>
 
               {/* Tên */}
-              <h3 className="font-bold text-gray-800 text-sm line-clamp-2 mb-2 group-hover:text-blue-700 min-h-[40px]">
-                {product.name}
+              <h3 className="font-bold text-gray-800 text-sm line-clamp-2 mb-2 group-hover:text-blue-700 min-h-[40px] transition">
+                {product.title}
               </h3>
 
               {/* Giá */}
               <div className="mt-auto">
-                <p className="text-blue-600 font-bold">
+                <p className="text-blue-700 font-bold text-lg">
                   {product.price?.toLocaleString("vi-VN")}đ
                   <span className="text-gray-400 text-xs font-normal ml-1">
                     / {product.unit}

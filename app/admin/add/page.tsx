@@ -13,7 +13,7 @@ export default function AddProductPage() {
     title: "",
     price: "",
     old_price: "",
-    img: "", 
+    img: "",
     category: "",
     brand: "",
     origin: "Đài Loan",
@@ -45,40 +45,44 @@ export default function AddProductPage() {
     }
 
     try {
-      let finalImageString = ""; 
+      let finalImageString = "";
 
       // --- XỬ LÝ UPLOAD ẢNH LÊN STORAGE ---
       if (selectedFiles.length > 0) {
         setUploading(true);
         const uploadedUrls: string[] = [];
-        
+
         for (const file of selectedFiles) {
           // Tạo tên file độc nhất để tránh bị ghi đè
-          const fileExt = file.name.split('.').pop();
+          const fileExt = file.name.split(".").pop();
           const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
           const filePath = `${fileName}`;
 
           const { error: uploadError } = await supabase.storage
-            .from("products") // 👈 PHẢI TRÙNG TÊN VỚI BUCKET ĐÃ TẠO
+            .from("tw-mart-products") // 👈 Đã đổi sang bucket cho sản phẩm
             .upload(filePath, file);
 
           if (uploadError) {
             console.error("Lỗi Storage:", uploadError);
-            throw new Error(`Không thể tải ảnh ${file.name} lên kho. Vui lòng kiểm tra quyền Public của Bucket 'products'`);
+            throw new Error(
+              `Không thể tải ảnh ${file.name} lên kho. Vui lòng kiểm tra quyền Public của Bucket 'tw-mart-products'`,
+            );
           }
 
           const { data: urlData } = supabase.storage
-            .from("products")
+            .from("tw-mart-products") // 👈 Đã đổi sang bucket cho sản phẩm
             .getPublicUrl(filePath);
 
           uploadedUrls.push(urlData.publicUrl);
         }
-        
+
         finalImageString = JSON.stringify(uploadedUrls);
         setUploading(false);
       } else if (formData.img) {
         // Dự phòng nếu dán link ảnh trực tiếp
-        finalImageString = formData.img.startsWith("[") ? formData.img : JSON.stringify([formData.img]);
+        finalImageString = formData.img.startsWith("[")
+          ? formData.img
+          : JSON.stringify([formData.img]);
       }
 
       // --- LƯU THÔNG TIN VÀO DATABASE ---
@@ -96,11 +100,15 @@ export default function AddProductPage() {
         is_best_seller: formData.is_best_seller,
       };
 
-      const { error: dbError } = await supabase.from("products_tw").insert([payload]);
-      
+      const { error: dbError } = await supabase
+        .from("products_tw")
+        .insert([payload]);
+
       if (dbError) {
         console.error("Lỗi Database:", dbError);
-        throw new Error("Lỗi khi lưu thông tin vào bảng products_tw: " + dbError.message);
+        throw new Error(
+          "Lỗi khi lưu thông tin vào bảng products_tw: " + dbError.message,
+        );
       }
 
       alert("✅ Đã đăng hàng lên shop TWMED thành công!");
@@ -122,9 +130,14 @@ export default function AddProductPage() {
             <h1 className="text-3xl font-black text-blue-900 uppercase tracking-tighter">
               🇹🇼 Thêm Hàng Đài Loan
             </h1>
-            <p className="text-gray-500 text-sm italic">Hệ thống lưu trữ ảnh thông minh</p>
+            <p className="text-gray-500 text-sm italic">
+              Hệ thống lưu trữ ảnh thông minh
+            </p>
           </div>
-          <Link href="/admin/inventory" className="text-blue-600 hover:underline font-bold text-sm">
+          <Link
+            href="/admin/inventory"
+            className="text-blue-600 hover:underline font-bold text-sm"
+          >
             ← Xem kho hàng
           </Link>
         </div>
@@ -133,13 +146,33 @@ export default function AddProductPage() {
           {/* Tên & Danh mục */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2">
-              <label className="block text-sm font-bold text-gray-700 mb-2">Tên sản phẩm (*)</label>
-              <input type="text" className="w-full p-4 border-2 border-gray-100 rounded-xl focus:border-red-500 outline-none transition" placeholder="VD: Bánh dứa Chia Te..." value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} required />
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Tên sản phẩm (*)
+              </label>
+              <input
+                type="text"
+                className="w-full p-4 border-2 border-gray-100 rounded-xl focus:border-red-500 outline-none transition"
+                placeholder="VD: Bánh dứa Chia Te..."
+                value={formData.title}
+                onChange={(e) =>
+                  setFormData({ ...formData, title: e.target.value })
+                }
+                required
+              />
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Danh mục (*)</label>
-              <select className="w-full p-4 border-2 border-gray-100 rounded-xl focus:border-red-500 outline-none bg-white" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} required>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Danh mục (*)
+              </label>
+              <select
+                className="w-full p-4 border-2 border-gray-100 rounded-xl focus:border-red-500 outline-none bg-white"
+                value={formData.category}
+                onChange={(e) =>
+                  setFormData({ ...formData, category: e.target.value })
+                }
+                required
+              >
                 <option value="">-- Chọn danh mục --</option>
                 <option value="Dầu Gió & Cao Dán">Dầu Gió & Cao Dán</option>
                 <option value="Mỹ Phẩm & Skincare">Mỹ Phẩm & Skincare</option>
@@ -149,24 +182,62 @@ export default function AddProductPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Thương hiệu</label>
-              <input type="text" className="w-full p-4 border-2 border-gray-100 rounded-xl" placeholder="VD: Chia Te" value={formData.brand} onChange={(e) => setFormData({...formData, brand: e.target.value})} />
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Thương hiệu
+              </label>
+              <input
+                type="text"
+                className="w-full p-4 border-2 border-gray-100 rounded-xl"
+                placeholder="VD: Chia Te"
+                value={formData.brand}
+                onChange={(e) =>
+                  setFormData({ ...formData, brand: e.target.value })
+                }
+              />
             </div>
           </div>
 
           {/* Tài chính & Kho */}
           <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100 grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <label className="block text-sm font-bold text-blue-800 mb-2">Giá bán (đ)</label>
-              <input type="number" className="w-full p-3 border-2 border-white rounded-lg font-bold text-red-600" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} required />
+              <label className="block text-sm font-bold text-blue-800 mb-2">
+                Giá bán (đ)
+              </label>
+              <input
+                type="number"
+                className="w-full p-3 border-2 border-white rounded-lg font-bold text-red-600"
+                value={formData.price}
+                onChange={(e) =>
+                  setFormData({ ...formData, price: e.target.value })
+                }
+                required
+              />
             </div>
             <div>
-              <label className="block text-sm font-bold text-gray-600 mb-2">Giá cũ (nếu có)</label>
-              <input type="number" className="w-full p-3 border-2 border-white rounded-lg" value={formData.old_price} onChange={(e) => setFormData({...formData, old_price: e.target.value})} />
+              <label className="block text-sm font-bold text-gray-600 mb-2">
+                Giá cũ (nếu có)
+              </label>
+              <input
+                type="number"
+                className="w-full p-3 border-2 border-white rounded-lg"
+                value={formData.old_price}
+                onChange={(e) =>
+                  setFormData({ ...formData, old_price: e.target.value })
+                }
+              />
             </div>
             <div>
-              <label className="block text-sm font-bold text-gray-600 mb-2">Tồn kho</label>
-              <input type="number" className="w-full p-3 border-2 border-white rounded-lg text-center font-bold" value={formData.stock_quantity} onChange={(e) => setFormData({...formData, stock_quantity: e.target.value})} />
+              <label className="block text-sm font-bold text-gray-600 mb-2">
+                Tồn kho
+              </label>
+              <input
+                type="number"
+                className="w-full p-3 border-2 border-white rounded-lg text-center font-bold"
+                value={formData.stock_quantity}
+                onChange={(e) =>
+                  setFormData({ ...formData, stock_quantity: e.target.value })
+                }
+              />
             </div>
           </div>
 
@@ -175,14 +246,25 @@ export default function AddProductPage() {
             <label className="block text-sm font-bold text-gray-700 mb-4 flex items-center justify-center gap-2">
               📸 Tải ảnh lên Storage (Tối đa 6 ảnh)
             </label>
-            <input type="file" accept="image/*" multiple onChange={handleFileChange} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-red-700 hover:file:bg-red-100 cursor-pointer" />
-            
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleFileChange}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-red-700 hover:file:bg-red-100 cursor-pointer"
+            />
+
             {previewUrls.length > 0 && (
               <div className="flex flex-wrap justify-center gap-3 mt-6">
                 {previewUrls.map((url, i) => (
-                  <div key={i} className="relative group shadow-md rounded-lg overflow-hidden border-2 border-white">
+                  <div
+                    key={i}
+                    className="relative group shadow-md rounded-lg overflow-hidden border-2 border-white"
+                  >
                     <img src={url} className="w-24 h-24 object-cover" />
-                    <div className="absolute top-0 right-0 bg-red-600 text-white text-[10px] px-1.5 py-0.5 font-bold">#{i+1}</div>
+                    <div className="absolute top-0 right-0 bg-red-600 text-white text-[10px] px-1.5 py-0.5 font-bold">
+                      #{i + 1}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -191,17 +273,41 @@ export default function AddProductPage() {
 
           {/* Mô tả & Submit */}
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">Mô tả & Công dụng</label>
-            <textarea className="w-full p-4 border-2 border-gray-100 rounded-xl h-40 focus:border-red-500 outline-none" placeholder="Thông tin chi tiết về sản phẩm..." value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})}></textarea>
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              Mô tả & Công dụng
+            </label>
+            <textarea
+              className="w-full p-4 border-2 border-gray-100 rounded-xl h-40 focus:border-red-500 outline-none"
+              placeholder="Thông tin chi tiết về sản phẩm..."
+              value={formData.description}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
+            ></textarea>
           </div>
 
           <div className="flex items-center gap-4 bg-yellow-50 p-4 rounded-xl border border-yellow-100">
-             <input type="checkbox" className="w-6 h-6 rounded border-yellow-400 text-yellow-600" checked={formData.is_best_seller} onChange={(e) => setFormData({...formData, is_best_seller: e.target.checked})} />
-             <label className="text-sm font-bold text-yellow-800 uppercase italic">🔥 Đặt sản phẩm vào mục "Bán chạy" tại trang chủ</label>
+            <input
+              type="checkbox"
+              className="w-6 h-6 rounded border-yellow-400 text-yellow-600"
+              checked={formData.is_best_seller}
+              onChange={(e) =>
+                setFormData({ ...formData, is_best_seller: e.target.checked })
+              }
+            />
+            <label className="text-sm font-bold text-yellow-800 uppercase italic">
+              🔥 Đặt sản phẩm vào mục "Bán chạy" tại trang chủ
+            </label>
           </div>
 
-          <button type="submit" disabled={loading || uploading} className={`w-full py-5 rounded-2xl font-black text-white text-xl shadow-2xl transition transform active:scale-95 ${loading || uploading ? "bg-gray-400" : "bg-gradient-to-r from-blue-900 via-red-600 to-blue-900 bg-[length:200%_auto] hover:bg-right"}`}>
-            {loading || uploading ? "⏳ ĐANG XỬ LÝ DỮ LIỆU..." : "🚀 ĐĂNG SẢN PHẨM LÊN SHOP"}
+          <button
+            type="submit"
+            disabled={loading || uploading}
+            className={`w-full py-5 rounded-2xl font-black text-white text-xl shadow-2xl transition transform active:scale-95 ${loading || uploading ? "bg-gray-400" : "bg-gradient-to-r from-blue-900 via-red-600 to-blue-900 bg-[length:200%_auto] hover:bg-right"}`}
+          >
+            {loading || uploading
+              ? "⏳ ĐANG XỬ LÝ DỮ LIỆU..."
+              : "🚀 ĐĂNG SẢN PHẨM LÊN SHOP"}
           </button>
         </form>
       </div>

@@ -14,7 +14,7 @@ export default function EditProductPage() {
 
   // --- QUẢN LÝ ẢNH ---
   const [existingImages, setExistingImages] = useState<string[]>([]); // Ảnh cũ từ DB
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);     // File mới chọn từ máy
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]); // File mới chọn từ máy
   const [previewNewUrls, setPreviewNewUrls] = useState<string[]>([]); // Xem trước ảnh mới
 
   // State thông tin sản phẩm
@@ -80,7 +80,7 @@ export default function EditProductPage() {
     const files = e.target.files;
     if (files && files.length > 0) {
       const fileArray = Array.from(files);
-      
+
       // Kiểm tra tổng số ảnh (Cũ + Mới không quá 6)
       if (existingImages.length + fileArray.length > 6) {
         alert("⚠️ Tổng số ảnh (cũ + mới) không được quá 6 hình!");
@@ -96,13 +96,19 @@ export default function EditProductPage() {
 
   const removeExistingImage = (indexToRemove: number) => {
     if (window.confirm("Bạn muốn xóa ảnh này khỏi danh sách?")) {
-      setExistingImages((prev) => prev.filter((_, index) => index !== indexToRemove));
+      setExistingImages((prev) =>
+        prev.filter((_, index) => index !== indexToRemove),
+      );
     }
   };
 
   const removeNewFile = (indexToRemove: number) => {
-    setSelectedFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
-    setPreviewNewUrls((prev) => prev.filter((_, index) => index !== indexToRemove));
+    setSelectedFiles((prev) =>
+      prev.filter((_, index) => index !== indexToRemove),
+    );
+    setPreviewNewUrls((prev) =>
+      prev.filter((_, index) => index !== indexToRemove),
+    );
   };
 
   // --- LƯU DỮ LIỆU ---
@@ -118,15 +124,16 @@ export default function EditProductPage() {
         for (const file of selectedFiles) {
           // Tạo tên file ngẫu nhiên để tránh trùng
           const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}_${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
-          
+
           const { error: uploadError } = await supabase.storage
-            .from("products") // Đảm bảo bucket tên là 'products'
+            .from("tw-mart-products") // [ĐÃ SỬA] Đổi sang bucket mới
             .upload(fileName, file);
 
-          if (uploadError) throw new Error("Lỗi upload ảnh: " + uploadError.message);
+          if (uploadError)
+            throw new Error("Lỗi upload ảnh: " + uploadError.message);
 
           const { data: urlData } = supabase.storage
-            .from("products")
+            .from("tw-mart-products") // [ĐÃ SỬA] Đổi sang bucket mới
             .getPublicUrl(fileName);
 
           finalImages.push(urlData.publicUrl);
@@ -157,44 +164,65 @@ export default function EditProductPage() {
     }
   };
 
-  if (loading) return <div className="p-10 text-center text-gray-500">⏳ Đang tải thông tin...</div>;
+  if (loading)
+    return (
+      <div className="p-10 text-center text-gray-500">
+        ⏳ Đang tải thông tin...
+      </div>
+    );
 
   return (
     <div className="min-h-screen bg-gray-50 p-6 font-sans">
       <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
         <div className="bg-blue-600 px-6 py-4 flex justify-between items-center">
-          <h1 className="text-white text-xl font-bold">✏️ Chỉnh Sửa Sản Phẩm</h1>
-          <Link href="/admin/inventory" className="text-blue-100 hover:text-white text-sm font-bold">
-              ↩ Quay lại Kho
+          <h1 className="text-white text-xl font-bold">
+            ✏️ Chỉnh Sửa Sản Phẩm
+          </h1>
+          <Link
+            href="/admin/inventory"
+            className="text-blue-100 hover:text-white text-sm font-bold"
+          >
+            ↩ Quay lại Kho
           </Link>
         </div>
 
         <form onSubmit={handleUpdate} className="p-6 space-y-6 text-gray-700">
-          
           {/* Tên sản phẩm */}
           <div>
-            <label className="block text-sm font-bold mb-1">Tên sản phẩm (*)</label>
+            <label className="block text-sm font-bold mb-1">
+              Tên sản phẩm (*)
+            </label>
             <input
               type="text"
               className="w-full p-3 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
               value={product.title}
-              onChange={(e) => setProduct({ ...product, title: e.target.value })}
+              onChange={(e) =>
+                setProduct({ ...product, title: e.target.value })
+              }
               required
             />
           </div>
 
           {/* --- KHU VỰC QUẢN LÝ ẢNH (MỚI) --- */}
           <div className="bg-gray-50 p-4 rounded border border-dashed border-gray-400">
-            <label className="block text-sm font-bold mb-3">📸 Quản lý hình ảnh (Tối đa 6)</label>
-            
+            <label className="block text-sm font-bold mb-3">
+              📸 Quản lý hình ảnh (Tối đa 6)
+            </label>
+
             {/* 1. Danh sách ảnh cũ */}
             {existingImages.length > 0 && (
               <div className="mb-4">
-                <p className="text-xs text-gray-500 mb-2">Ảnh hiện có (Bấm vào ❌ để xóa):</p>
+                <p className="text-xs text-gray-500 mb-2">
+                  Ảnh hiện có (Bấm vào ❌ để xóa):
+                </p>
                 <div className="grid grid-cols-4 gap-2">
                   {existingImages.map((url, idx) => (
                     <div key={idx} className="relative group w-20 h-20">
-                      <img src={url} alt="old" className="w-full h-full object-cover rounded border bg-white" />
+                      <img
+                        src={url}
+                        alt="old"
+                        className="w-full h-full object-cover rounded border bg-white"
+                      />
                       <button
                         type="button"
                         onClick={() => removeExistingImage(idx)}
@@ -211,27 +239,35 @@ export default function EditProductPage() {
 
             {/* 2. Upload ảnh mới */}
             <div className="mt-2">
-               <label className="cursor-pointer bg-blue-100 text-blue-700 px-4 py-2 rounded font-bold hover:bg-blue-200 inline-block transition">
-                 📂 Chọn thêm ảnh từ máy tính
-                 <input 
-                   type="file" 
-                   multiple 
-                   accept="image/*" 
-                   onChange={handleFileChange} 
-                   className="hidden" 
-                 />
-               </label>
-               <p className="text-xs text-gray-400 mt-1 italic">Giữ phím Ctrl để chọn nhiều ảnh cùng lúc.</p>
+              <label className="cursor-pointer bg-blue-100 text-blue-700 px-4 py-2 rounded font-bold hover:bg-blue-200 inline-block transition">
+                📂 Chọn thêm ảnh từ máy tính
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </label>
+              <p className="text-xs text-gray-400 mt-1 italic">
+                Giữ phím Ctrl để chọn nhiều ảnh cùng lúc.
+              </p>
             </div>
 
             {/* 3. Preview ảnh mới chọn */}
             {previewNewUrls.length > 0 && (
               <div className="mt-4 border-t pt-2">
-                <p className="text-xs text-green-600 mb-2 font-bold">Ảnh mới chuẩn bị upload:</p>
+                <p className="text-xs text-green-600 mb-2 font-bold">
+                  Ảnh mới chuẩn bị upload:
+                </p>
                 <div className="grid grid-cols-4 gap-2">
                   {previewNewUrls.map((url, idx) => (
                     <div key={idx} className="relative w-20 h-20">
-                      <img src={url} alt="new" className="w-full h-full object-cover rounded border border-green-400" />
+                      <img
+                        src={url}
+                        alt="new"
+                        className="w-full h-full object-cover rounded border border-green-400"
+                      />
                       <button
                         type="button"
                         onClick={() => removeNewFile(idx)}
@@ -251,44 +287,60 @@ export default function EditProductPage() {
           {/* Giá cả */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-bold mb-1 text-red-600">Giá bán (VNĐ)</label>
+              <label className="block text-sm font-bold mb-1 text-red-600">
+                Giá bán (VNĐ)
+              </label>
               <input
                 type="number"
                 className="w-full p-3 border rounded focus:ring-2 focus:ring-blue-500 outline-none font-bold"
                 value={product.price}
-                onChange={(e) => setProduct({ ...product, price: Number(e.target.value) })}
+                onChange={(e) =>
+                  setProduct({ ...product, price: Number(e.target.value) })
+                }
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-bold mb-1 text-gray-500">Giá cũ (nếu có)</label>
+              <label className="block text-sm font-bold mb-1 text-gray-500">
+                Giá cũ (nếu có)
+              </label>
               <input
                 type="number"
                 className="w-full p-3 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
                 value={product.old_price}
-                onChange={(e) => setProduct({ ...product, old_price: Number(e.target.value) })}
+                onChange={(e) =>
+                  setProduct({ ...product, old_price: Number(e.target.value) })
+                }
               />
             </div>
           </div>
 
           {/* Danh mục & Mô tả */}
           <div>
-            <label className="block text-sm font-bold mb-1">Mã Danh Mục (Category ID)</label>
+            <label className="block text-sm font-bold mb-1">
+              Mã Danh Mục (Category ID)
+            </label>
             <input
               type="text"
               className="w-full p-3 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
               value={product.category_id}
-              onChange={(e) => setProduct({ ...product, category_id: e.target.value })}
+              onChange={(e) =>
+                setProduct({ ...product, category_id: e.target.value })
+              }
             />
           </div>
 
           <div>
-            <label className="block text-sm font-bold mb-1">Mô tả chi tiết</label>
+            <label className="block text-sm font-bold mb-1">
+              Mô tả chi tiết
+            </label>
             <textarea
               rows={5}
               className="w-full p-3 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
               value={product.description}
-              onChange={(e) => setProduct({ ...product, description: e.target.value })}
+              onChange={(e) =>
+                setProduct({ ...product, description: e.target.value })
+              }
             />
           </div>
 
@@ -298,17 +350,19 @@ export default function EditProductPage() {
               type="submit"
               disabled={updating}
               className={`flex-1 py-3 rounded-lg font-bold text-white text-lg shadow transition ${
-                updating ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+                updating
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-blue-600 hover:bg-blue-700"
               }`}
             >
               {updating ? "⏳ Đang lưu & Upload..." : "💾 LƯU THAY ĐỔI"}
             </button>
-            
+
             <Link
-                href="/admin/inventory"
-                className="px-8 py-3 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 flex items-center justify-center transition"
+              href="/admin/inventory"
+              className="px-8 py-3 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 flex items-center justify-center transition"
             >
-                Hủy
+              Hủy
             </Link>
           </div>
         </form>

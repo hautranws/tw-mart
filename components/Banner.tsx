@@ -4,25 +4,8 @@ import { supabase } from "@/lib/supabaseClient";
 
 export default function Banner() {
   // Ảnh mặc định (dùng khi chưa load được data hoặc DB trống)
-  const defaultSlides = [
-    {
-      id: 1,
-      image_url:
-        "https://cdn.nhathuoclongchau.com.vn/unsafe/828x0/filters:quality(90)/https://cms-prod.s3-sgn09.fptcloud.com/Banner_Web_PC_1610x492_6_28c0397556.png",
-    },
-    {
-      id: 2,
-      image_url:
-        "https://cdn.nhathuoclongchau.com.vn/unsafe/828x0/filters:quality(90)/https://cms-prod.s3-sgn09.fptcloud.com/Banner_Web_PC_1610x492_5_e890397556.png",
-    },
-    {
-      id: 3,
-      image_url:
-        "https://cdn.nhathuoclongchau.com.vn/unsafe/828x0/filters:quality(90)/https://cms-prod.s3-sgn09.fptcloud.com/Banner_Web_PC_1610x492_4_d890397556.png",
-    },
-  ];
-
-  const [slides, setSlides] = useState<any[]>(defaultSlides);
+  // Bắt đầu với mảng rỗng, chỉ hiển thị banner từ Supabase
+  const [slides, setSlides] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
 
   // --- 1. LẤY DỮ LIỆU TỪ SUPABASE ---
@@ -34,7 +17,7 @@ export default function Banner() {
         .eq("active", true) // Chỉ lấy banner đang bật
         .order("created_at", { ascending: false }); // Lấy mới nhất trước
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         setSlides(data);
       }
     };
@@ -48,7 +31,7 @@ export default function Banner() {
 
     const timer = setInterval(() => {
       setCurrentIndex((prevIndex) =>
-        prevIndex === slides.length - 1 ? 0 : prevIndex + 1
+        prevIndex === slides.length - 1 ? 0 : prevIndex + 1,
       );
     }, 4000); // 4 giây chuyển 1 lần
 
@@ -70,7 +53,7 @@ export default function Banner() {
         <button
           onClick={() =>
             setCurrentIndex(
-              currentIndex === 0 ? slides.length - 1 : currentIndex - 1
+              currentIndex === 0 ? slides.length - 1 : currentIndex - 1,
             )
           }
         >
@@ -83,7 +66,7 @@ export default function Banner() {
         <button
           onClick={() =>
             setCurrentIndex(
-              currentIndex === slides.length - 1 ? 0 : currentIndex + 1
+              currentIndex === slides.length - 1 ? 0 : currentIndex + 1,
             )
           }
         >
