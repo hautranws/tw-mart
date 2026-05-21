@@ -13,7 +13,7 @@ export default function BestSellerSection() {
     const fetchBestSellers = async () => {
       // Lấy các sản phẩm có is_best_seller = true
       const { data, error } = await supabase
-        .from("products")
+        .from("products_tw")
         .select("*")
         .eq("is_best_seller", true)
         .limit(10); // Lấy tối đa 10 sản phẩm

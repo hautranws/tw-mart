@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 
@@ -15,6 +15,12 @@ export default function AddProductPage() {
   const [imageItems, setImageItems] = useState<ImageItem[]>([]);
   const [draggedItem, setDraggedItem] = useState<ImageItem | null>(null);
 
+  // --- [MỚI] State cho Phân loại hàng (variants) ---
+  const [variants, setVariants] = useState([
+    { name: "", price: "", stock: "" },
+  ]);
+  const [useVariants, setUseVariants] = useState(false); // Checkbox để bật/tắt phân loại
+
   const [formData, setFormData] = useState({
     title: "",
     price: "",
@@ -29,6 +35,42 @@ export default function AddProductPage() {
     is_best_seller: false,
   });
 
+  // --- [MỚI] Hàm quản lý Variants ---
+  const handleVariantChange = (index: number, field: string, value: string) => {
+    const newVariants = [...variants];
+    newVariants[index] = { ...newVariants[index], [field]: value };
+    setVariants(newVariants);
+  };
+
+  const addVariant = () => {
+    setVariants([...variants, { name: "", price: "", stock: "" }]);
+  };
+
+  const removeVariant = (index: number) => {
+    if (variants.length <= 1) {
+      alert("Phải có ít nhất một phân loại.");
+      return;
+    }
+    const newVariants = variants.filter((_, i) => i !== index);
+    setVariants(newVariants);
+  };
+
+  // Tự động cập nhật giá chính và tồn kho chính từ variant đầu tiên
+  useEffect(() => {
+    if (useVariants && variants.length > 0) {
+      const firstVariant = variants[0];
+      const totalStock = variants.reduce(
+        (sum, v) => sum + Number(v.stock || 0),
+        0,
+      );
+      setFormData((prev) => ({
+        ...prev,
+        price: firstVariant.price || "",
+        stock_quantity: String(totalStock),
+      }));
+    }
+  }, [variants, useVariants]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
@@ -36,6 +78,17 @@ export default function AddProductPage() {
         alert("Tối đa 6 ảnh!");
         return;
       }
+
+      // FIX OVERLOAD: Cảnh báo dung lượng ảnh để không bị sập Supabase Storage
+      for (let i = 0; i < files.length; i++) {
+        if (files[i].size > 2 * 1024 * 1024) {
+          alert(
+            `❌ Ảnh "${files[i].name}" quá nặng (>2MB). Vui lòng nén ảnh trước khi tải lên để tránh lỗi sập mạng!`,
+          );
+          return;
+        }
+      }
+
       const newItems = Array.from(files).map((file) => ({
         id: `${file.name}-${file.lastModified}-${Math.random()}`,
         file: file,
@@ -80,7 +133,11 @@ export default function AddProductPage() {
     e.preventDefault();
     setLoading(true);
 
-    if (!formData.title || !formData.price || !formData.category) {
+    if (
+      !formData.title ||
+      (!useVariants && !formData.price) ||
+      !formData.category
+    ) {
       alert("⚠️ Vui lòng điền Tên, Giá và Danh mục!");
       setLoading(false);
       return;
@@ -141,6 +198,9 @@ export default function AddProductPage() {
         description: formData.description,
         stock_quantity: Number(formData.stock_quantity),
         is_best_seller: formData.is_best_seller,
+        variants: useVariants
+          ? JSON.stringify(variants.filter((v) => v.name && v.price))
+          : null,
       };
 
       const { error: dbError } = await supabase
@@ -241,47 +301,174 @@ export default function AddProductPage() {
           </div>
 
           {/* Tài chính & Kho */}
-          <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100 grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-sm font-bold text-blue-800 mb-2">
-                Giá bán (đ)
-              </label>
+          <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100 space-y-4">
+            <div className="flex items-center gap-3">
               <input
-                type="number"
-                className="w-full p-3 border-2 border-white rounded-lg font-bold text-red-600"
-                value={formData.price}
-                onChange={(e) =>
-                  setFormData({ ...formData, price: e.target.value })
-                }
-                required
+                type="checkbox"
+                id="use-variants"
+                className="w-5 h-5"
+                checked={useVariants}
+                onChange={(e) => setUseVariants(e.target.checked)}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-600 mb-2">
-                Giá cũ (nếu có)
+              <label
+                htmlFor="use-variants"
+                className="font-bold text-blue-800 text-lg"
+              >
+                Sản phẩm có nhiều phân loại (dung tích, màu sắc...)
               </label>
-              <input
-                type="number"
-                className="w-full p-3 border-2 border-white rounded-lg"
-                value={formData.old_price}
-                onChange={(e) =>
-                  setFormData({ ...formData, old_price: e.target.value })
-                }
-              />
             </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-600 mb-2">
-                Tồn kho
-              </label>
-              <input
-                type="number"
-                className="w-full p-3 border-2 border-white rounded-lg text-center font-bold"
-                value={formData.stock_quantity}
-                onChange={(e) =>
-                  setFormData({ ...formData, stock_quantity: e.target.value })
-                }
-              />
-            </div>
+
+            {/* --- Giao diện cho sản phẩm có phân loại --- */}
+            {useVariants ? (
+              <div className="space-y-3 animate-fade-in">
+                {variants.map((variant, index) => (
+                  <div
+                    key={index}
+                    className="grid grid-cols-12 gap-2 items-center p-2 bg-white/50 rounded"
+                  >
+                    <div className="col-span-5">
+                      <label className="text-xs font-bold text-gray-500">
+                        Tên phân loại (*)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="VD: 100ml"
+                        value={variant.name}
+                        onChange={(e) =>
+                          handleVariantChange(index, "name", e.target.value)
+                        }
+                        className="w-full p-2 border rounded"
+                        required
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <label className="text-xs font-bold text-gray-500">
+                        Giá (đ) (*)
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="150000"
+                        value={variant.price}
+                        onChange={(e) =>
+                          handleVariantChange(index, "price", e.target.value)
+                        }
+                        className="w-full p-2 border rounded"
+                        required
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-xs font-bold text-gray-500">
+                        Tồn kho
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="10"
+                        value={variant.stock}
+                        onChange={(e) =>
+                          handleVariantChange(index, "stock", e.target.value)
+                        }
+                        className="w-full p-2 border rounded"
+                      />
+                    </div>
+                    <div className="col-span-2 flex items-end h-full">
+                      <button
+                        type="button"
+                        onClick={() => removeVariant(index)}
+                        className="bg-red-100 text-red-600 h-10 w-10 rounded font-bold hover:bg-red-200"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addVariant}
+                  className="w-full text-sm bg-blue-100 text-blue-700 font-bold py-2 rounded hover:bg-blue-200"
+                >
+                  + Thêm phân loại
+                </button>
+                <div className="text-xs text-gray-500 italic pt-2 border-t border-blue-200">
+                  <p>
+                    Giá bán và tồn kho chính của sản phẩm sẽ được tự động tính
+                    toán dựa trên các phân loại bạn đã nhập.
+                  </p>
+                  <p>Giá bán chính sẽ lấy theo giá của phân loại đầu tiên.</p>
+                  <p>
+                    Tồn kho chính sẽ là tổng tồn kho của tất cả các phân loại.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              /* --- Giao diện cho sản phẩm không có phân loại (như cũ) --- */
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
+                <div>
+                  <label className="block text-sm font-bold text-blue-800 mb-2">
+                    Giá bán (đ) (*)
+                  </label>
+                  <input
+                    type="number"
+                    className="w-full p-3 border-2 border-white rounded-lg font-bold text-red-600"
+                    value={formData.price}
+                    onChange={(e) =>
+                      setFormData({ ...formData, price: e.target.value })
+                    }
+                    required={!useVariants}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-600 mb-2">
+                    Giá cũ (nếu có)
+                  </label>
+                  <input
+                    type="number"
+                    className="w-full p-3 border-2 border-white rounded-lg"
+                    value={formData.old_price}
+                    onChange={(e) =>
+                      setFormData({ ...formData, old_price: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-600 mb-2">
+                    Tồn kho
+                  </label>
+                  <input
+                    type="number"
+                    className="w-full p-3 border-2 border-white rounded-lg text-center font-bold"
+                    value={formData.stock_quantity}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        stock_quantity: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Hiển thị giá và tồn kho được tính toán */}
+            {useVariants && (
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-blue-200">
+                <div className="text-sm">
+                  <p className="font-bold text-gray-500">
+                    Giá bán chính (tự động):
+                  </p>
+                  <p className="font-bold text-red-600 text-lg">
+                    {Number(formData.price).toLocaleString("vi-VN")}đ
+                  </p>
+                </div>
+                <div className="text-sm">
+                  <p className="font-bold text-gray-500">
+                    Tổng tồn kho (tự động):
+                  </p>
+                  <p className="font-bold text-blue-600 text-lg">
+                    {formData.stock_quantity}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* UPLOAD ẢNH */}

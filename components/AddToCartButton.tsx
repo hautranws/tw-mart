@@ -3,12 +3,43 @@
 import React from "react";
 import { useCart } from "../context/CartContext"; // Kết nối với kho giỏ hàng
 
-export default function AddToCartButton({ product }: { product: any }) {
+export default function AddToCartButton({
+  product,
+  selectedVariant,
+}: {
+  product: any;
+  selectedVariant: any;
+}) {
   const { addToCart } = useCart(); // Lấy hàm thêm hàng
 
   // Hàm xử lý khi bấm nút
   const handleAddToCart = () => {
-    addToCart(product);
+    // [QUAN TRỌNG]
+    // Trang chi tiết sản phẩm (app/product/[id]/page.tsx) cần quản lý state `selectedVariant`.
+    // Khi người dùng chọn một phân loại (VD: 100ml), state đó sẽ được cập nhật.
+    // Nút "Thêm vào giỏ" này sẽ nhận `selectedVariant` đó làm prop.
+
+    // [MỚI] Kiểm tra một cách an toàn xem sản phẩm có thực sự có phân loại không
+    let hasVariants = false;
+    try {
+      const variantsList = product.variants ? JSON.parse(product.variants) : [];
+      if (Array.isArray(variantsList) && variantsList.length > 0) {
+        hasVariants = true;
+      }
+    } catch {}
+
+    // Nếu sản phẩm có phân loại nhưng người dùng chưa chọn, thì báo lỗi.
+    if (hasVariants && !selectedVariant) {
+      alert("Vui lòng chọn một phân loại hàng (VD: dung tích, màu sắc).");
+      return;
+    }
+
+    // Gọi hàm addToCart với thông tin phân loại đã chọn.
+    // BẠN CẦN CẬP NHẬT LẠI `useCart` context để xử lý logic này.
+    // Ví dụ: addToCart(product, selectedVariant)
+    // Trong context, cart item sẽ có dạng: { ...product, quantity: 1, selectedVariant: selectedVariant }
+    // Giá của cart item sẽ là selectedVariant.price
+    addToCart(product, selectedVariant);
   };
 
   return (

@@ -23,7 +23,7 @@ export default async function RelatedProducts({
 }) {
   // GỌI KHO: Lấy 4 sản phẩm cùng danh mục, nhưng KHÔNG LẤY sản phẩm đang xem (neq)
   const { data: products } = await supabase
-    .from("products")
+    .from("products_tw")
     .select("*")
     .eq("category", category) // Cùng loại
     .neq("id", currentId) // Khác bài đang xem

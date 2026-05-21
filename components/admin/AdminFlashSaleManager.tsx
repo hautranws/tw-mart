@@ -30,7 +30,7 @@ export default function AdminFlashSaleManager() {
   // --- 1. LẤY DANH SÁCH ĐANG FLASH SALE ---
   const fetchFlashItems = async () => {
     const { data } = await supabase
-      .from("products")
+      .from("products_tw")
       .select("*")
       .eq("is_flash_sale", true)
       .order("created_at", { ascending: false });
@@ -48,7 +48,7 @@ export default function AdminFlashSaleManager() {
     if (!confirm("Bạn chắc chắn muốn gỡ sản phẩm này khỏi Flash Sale?")) return;
 
     const { error } = await supabase
-      .from("products")
+      .from("products_tw")
       .update({
         is_flash_sale: false,
         flash_sale_price: 0,
@@ -70,7 +70,7 @@ export default function AdminFlashSaleManager() {
     if (!searchTerm.trim()) return;
 
     const { data } = await supabase
-      .from("products")
+      .from("products_tw")
       .select("*")
       .ilike("title", `%${searchTerm}%`)
       .limit(5);
@@ -114,7 +114,7 @@ export default function AdminFlashSaleManager() {
     // Kiểm tra giờ bắt đầu có nằm trong khoảng cấm (1h - 8h sáng) không
     if (startHour >= 1 && startHour < 8) {
       alert(
-        "Không thể bắt đầu Flash Sale trong khung giờ nghỉ (01:00 - 08:00)!"
+        "Không thể bắt đầu Flash Sale trong khung giờ nghỉ (01:00 - 08:00)!",
       );
       return;
     }
@@ -123,7 +123,7 @@ export default function AdminFlashSaleManager() {
     // Lưu ý: Trường hợp kết thúc đúng lúc 1h sáng là hợp lệ
     if (endHour > 1 && endHour < 8) {
       alert(
-        "Không thể kết thúc Flash Sale trong khung giờ nghỉ (01:00 - 08:00)!"
+        "Không thể kết thúc Flash Sale trong khung giờ nghỉ (01:00 - 08:00)!",
       );
       return;
     }
@@ -138,7 +138,7 @@ export default function AdminFlashSaleManager() {
       // 24h - 6h nghỉ = 18h tối đa
       if (
         !confirm(
-          "Thời gian sale khá dài, có thể bao gồm khung giờ nghỉ (1h-8h). Bạn có chắc chắn muốn tiếp tục không?"
+          "Thời gian sale khá dài, có thể bao gồm khung giờ nghỉ (1h-8h). Bạn có chắc chắn muốn tiếp tục không?",
         )
       ) {
         return;
@@ -147,7 +147,7 @@ export default function AdminFlashSaleManager() {
 
     // Update vào Supabase
     const { error } = await supabase
-      .from("products")
+      .from("products_tw")
       .update({
         is_flash_sale: true,
         flash_sale_price: price,

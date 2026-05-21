@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-const ADMIN_EMAIL = "admin@thienhau.com";
+const ADMIN_EMAIL = "tranthienhaudau2@gmail.com";
 const ADMIN_PHONE_CORE = "989217112"; // 9 số cuối của SĐT Admin
 
 export default function LoginPage() {
@@ -70,7 +70,6 @@ export default function LoginPage() {
 
       if (data.user) {
         router.push("/");
-        router.refresh();
       }
     } catch (error: any) {
       setMessage(`❌ Mã OTP không đúng hoặc hết hạn.`);
@@ -99,10 +98,18 @@ export default function LoginPage() {
       if (data.user) {
         // Đăng nhập thành công
         router.push("/");
-        router.refresh();
       }
     } catch (error: any) {
-      setMessage(`❌ Đăng nhập thất bại: Sai email hoặc mật khẩu.`);
+      // Cung cấp thông báo lỗi chi tiết hơn để dễ debug
+      if (error.message.includes("Failed to fetch")) {
+        setMessage(
+          "❌ Lỗi mạng: Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối internet, hoặc thử tắt các tiện ích chặn quảng cáo (Ad-blocker) và thử lại.",
+        );
+      } else if (error.message.includes("Invalid login credentials")) {
+        setMessage("❌ Đăng nhập thất bại: Sai email hoặc mật khẩu.");
+      } else {
+        setMessage(`❌ Lỗi không xác định: ${error.message}`);
+      }
     } finally {
       setLoading(false);
     }

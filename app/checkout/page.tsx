@@ -68,7 +68,13 @@ export default function CheckoutPage() {
 
   const subTotal = cart
     .filter((item) => selectedItems.includes(item.id))
-    .reduce((sum, item) => sum + item.price * item.quantity, 0);
+    .reduce((sum, item) => {
+      // [MỚI] Ưu tiên dùng giá của phân loại nếu có
+      const price = item.selectedVariant
+        ? item.selectedVariant.price
+        : item.price;
+      return sum + price * item.quantity;
+    }, 0);
 
   const currentCityName = useMemo(() => {
     if (deliveryMethod === "store") return "";
@@ -168,6 +174,10 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (cart.length > 0 && selectedItems.length === 0)
       setSelectedItems(cart.map((item) => item.id));
+  }, [cart]); // 👈 Chỉ theo dõi cart ở đây
+
+  useEffect(() => {
+    // 👈 Tách việc gọi API xuống DB ra một useEffect riêng, CHỈ CHẠY 1 LẦN khi load trang
 
     const fetchData = async () => {
       const {
@@ -223,7 +233,7 @@ export default function CheckoutPage() {
 
     fetchData();
     fetchCoupons();
-  }, [cart]);
+  }, []); // 👈 Rất quan trọng: Mảng rỗng để không bị gọi lại khi đổi số lượng món hàng
 
   useEffect(() => {
     if (currentCityName) {
@@ -539,7 +549,11 @@ export default function CheckoutPage() {
 
     const itemsToOrder = cart.filter((item) => selectedItems.includes(item.id));
     try {
-      const response = await fetch("/api/payment/create", {
+      // [FIX] Sử dụng URL tuyệt đối để tránh lỗi "Failed to fetch" trên một số môi trường
+      const absoluteUrl = new URL("/api/payment/create", window.location.origin)
+        .href;
+
+      const response = await fetch(absoluteUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -607,6 +621,15 @@ export default function CheckoutPage() {
                       <h3 className="font-bold text-gray-800 text-sm md:text-base leading-snug mb-1">
                         {item.title}
                       </h3>
+                      {/* [MỚI] Hiển thị phân loại hàng đã chọn */}
+                      {item.selectedVariant && (
+                        <p className="text-xs text-gray-500 font-medium bg-gray-100 px-2 py-0.5 rounded inline-block">
+                          Phân loại:{" "}
+                          <span className="font-bold">
+                            {item.selectedVariant.name}
+                          </span>
+                        </p>
+                      )}
                       <p className="text-red-600 font-black mb-2">
                         {item.price.toLocaleString("vi-VN")}đ
                       </p>

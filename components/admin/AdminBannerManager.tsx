@@ -64,14 +64,20 @@ export default function AdminBannerManager() {
         .from("banners")
         .insert([{ image_url: finalUrl, active: true }]);
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        // Ném ra lỗi cụ thể hơn để dễ debug
+        throw new Error(
+          `Lỗi khi lưu vào database: ${dbError.message}. Có thể do chính sách bảo mật (RLS) của bảng 'banners' chưa được cấu hình.`,
+        );
+      }
 
       alert("✅ Upload banner thành công!");
       fetchBanners(); // Load lại danh sách
     } catch (error: any) {
       console.error(error);
       alert(
-        "❌ Lỗi upload: " + (error.message || "Vui lòng kiểm tra lại Storage"),
+        "❌ Lỗi upload: " +
+          (error.message || "Vui lòng kiểm tra lại Storage và cấu hình RLS."),
       );
     } finally {
       setUploading(false);
@@ -81,10 +87,47 @@ export default function AdminBannerManager() {
   };
 
   // Xóa banner (Xóa cả trong DB và Storage nếu cần - ở đây xóa DB trước)
-  const handleDeleteBanner = async (id: number) => {
-    if (!confirm("Bạn chắc chắn muốn xóa banner này?")) return;
-    const { error } = await supabase.from("banners").delete().eq("id", id);
-    if (!error) fetchBanners();
+  const handleDeleteBanner = async (banner: Banner) => {
+    if (
+      !confirm(
+        "Bạn chắc chắn muốn xóa banner này? Hành động này sẽ xóa cả ảnh khỏi kho lưu trữ.",
+      )
+    )
+      return;
+
+    try {
+      // 1. Xóa bản ghi trong database
+      const { error: dbError } = await supabase
+        .from("banners")
+        .delete()
+        .eq("id", banner.id);
+      if (dbError) throw dbError;
+
+      // 2. Xóa file trong Storage
+      if (banner.image_url) {
+        const url = new URL(banner.image_url);
+        const pathSegments = url.pathname.split("/");
+        const bucketIndex = pathSegments.indexOf("tw-mart-banners");
+        if (bucketIndex > -1) {
+          const filePath = pathSegments.slice(bucketIndex + 1).join("/");
+          const { error: storageError } = await supabase.storage
+            .from("tw-mart-banners")
+            .remove([filePath]);
+          if (storageError) {
+            console.warn(
+              "Lỗi xóa file trên storage (có thể file không tồn tại):",
+              storageError.message,
+            );
+          }
+        }
+      }
+
+      alert("✅ Đã xóa banner thành công!");
+      fetchBanners(); // Tải lại danh sách
+    } catch (error: any) {
+      console.error("Lỗi xóa banner:", error);
+      alert("❌ Lỗi: " + error.message);
+    }
   };
 
   // Bật/Tắt banner
@@ -107,7 +150,7 @@ export default function AdminBannerManager() {
         <p className="font-bold">⚠️ Lưu ý cho nhân viên thiết kế:</p>
         <ul className="list-disc pl-5 mt-1 space-y-1">
           <li>
-            Kích thước chuẩn: <strong>1610 x 492 pixel</strong> (Tỷ lệ 3.2:1).
+            Kích thước đề nghị: <strong>1200 x 600 pixel</strong> (Tỷ lệ 2:1).
           </li>
           <li>Định dạng: JPG, PNG, WEBP.</li>
           <li>
@@ -193,7 +236,7 @@ export default function AdminBannerManager() {
                 {banner.active ? "Đang hiện" : "Đang ẩn"}
               </button>
               <button
-                onClick={() => handleDeleteBanner(banner.id)}
+                onClick={() => handleDeleteBanner(banner)}
                 className="px-3 py-1 bg-red-100 text-red-700 rounded text-xs font-bold hover:bg-red-200"
               >
                 Xóa

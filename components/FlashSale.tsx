@@ -32,7 +32,7 @@ export default function FlashSale() {
       // Lấy các sản phẩm đang bật cờ Flash Sale
       // Logic lọc ngày giờ sẽ xử lý kỹ hơn ở phía dưới để đảm bảo timezone VN
       const { data, error } = await supabase
-        .from("products")
+        .from("products_tw")
         .select("*")
         .eq("is_flash_sale", true)
         .limit(20);
@@ -53,7 +53,7 @@ export default function FlashSale() {
         // Nếu có sản phẩm, lấy thời gian kết thúc của sản phẩm đầu tiên làm mốc đếm ngược chung
         if (activeProducts.length > 0) {
           const firstProductEnd = new Date(
-            activeProducts[0].flash_sale_end
+            activeProducts[0].flash_sale_end,
           ).getTime();
           setEndTime(firstProductEnd);
         }
@@ -138,7 +138,7 @@ export default function FlashSale() {
           const discountPercent =
             item.price > 0
               ? Math.round(
-                  ((item.price - item.flash_sale_price) / item.price) * 100
+                  ((item.price - item.flash_sale_price) / item.price) * 100,
                 )
               : 0;
 

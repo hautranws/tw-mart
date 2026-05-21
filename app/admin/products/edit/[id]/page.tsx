@@ -36,6 +36,11 @@ export default function EditProductPage({
   const [imageItems, setImageItems] = useState<ImageItem[]>([]);
   const [draggedItem, setDraggedItem] = useState<ImageItem | null>(null);
 
+  // --- [MỚI] State cho Phân loại hàng (variants) ---
+  const [variants, setVariants] = useState([{ name: "", price: "", stock: "" }]);
+  const [useVariants, setUseVariants] = useState(false);
+
+
   useEffect(() => {
     const fetchProduct = async () => {
       try {
@@ -69,6 +74,17 @@ export default function EditProductPage({
           }));
           setImageItems(loadedImageItems);
 
+          // [MỚI] Load và xử lý variants
+          if (data.variants) {
+            try {
+                const parsedVariants = JSON.parse(data.variants);
+                if (Array.isArray(parsedVariants) && parsedVariants.length > 0) {
+                    setVariants(parsedVariants);
+                    setUseVariants(true);
+                }
+            } catch {}
+          }
+
           setFormData({
             title: data.title || "",
             price: String(data.price) || "",
@@ -92,7 +108,40 @@ export default function EditProductPage({
     };
 
     fetchProduct();
-  }, [params, router]);
+  }, [params.id, router]); // FIX VÒNG LẶP VÔ HẠN: Chỉ phụ thuộc vào params.id
+
+  // --- [MỚI] Hàm quản lý Variants ---
+  const handleVariantChange = (index: number, field: string, value: string) => {
+    const newVariants = [...variants];
+    newVariants[index] = { ...newVariants[index], [field]: value };
+    setVariants(newVariants);
+  };
+
+  const addVariant = () => {
+    setVariants([...variants, { name: "", price: "", stock: "" }]);
+  };
+
+  const removeVariant = (index: number) => {
+    if (variants.length <= 1) {
+      alert("Phải có ít nhất một phân loại.");
+      return;
+    }
+    const newVariants = variants.filter((_, i) => i !== index);
+    setVariants(newVariants);
+  };
+
+  // Tự động cập nhật giá chính và tồn kho chính từ variant đầu tiên
+  useEffect(() => {
+    if (useVariants && variants.length > 0) {
+      const firstVariant = variants[0];
+      const totalStock = variants.reduce((sum, v) => sum + Number(v.stock || 0), 0);
+      setFormData(prev => ({
+        ...prev,
+        price: firstVariant.price || "",
+        stock_quantity: String(totalStock)
+      }));
+    }
+  }, [variants, useVariants]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -101,6 +150,15 @@ export default function EditProductPage({
       alert("Tối đa 6 ảnh!");
       return;
     }
+
+    // FIX OVERLOAD: Kiểm tra dung lượng (giới hạn 2MB)
+    for (let i = 0; i < files.length; i++) {
+      if (files[i].size > 2 * 1024 * 1024) {
+        alert(`❌ Ảnh "${files[i].name}" quá nặng (>2MB). Vui lòng nén ảnh lại để tránh sập mạng tải lên!`);
+        return;
+      }
+    }
+
     const newItems: ImageItem[] = Array.from(files).map((file) => ({
       id: `${file.name}-${file.lastModified}-${Math.random()}`,
       file: file,
@@ -178,6 +236,7 @@ export default function EditProductPage({
         stock_quantity: Number(formData.stock_quantity),
         is_best_seller: formData.is_best_seller,
         img: JSON.stringify(finalImageUrls),
+        variants: useVariants ? JSON.stringify(variants.filter(v => v.name && v.price)) : null,
       };
 
       // 👈 CẬP NHẬT VÀO BẢNG ĐÀI LOAN
@@ -270,37 +329,85 @@ export default function EditProductPage({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-bold text-red-600 mb-2">
-                Giá bán (đ)
-              </label>
-              <input
-                type="number"
-                className="w-full p-4 border rounded-xl font-bold"
-                value={formData.price}
-                onChange={(e) =>
-                  setFormData({ ...formData, price: e.target.value })
-                }
-                required
-              />
+          <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100 space-y-4">
+            <div className="flex items-center gap-3">
+                <input type="checkbox" id="use-variants" className="w-5 h-5" checked={useVariants} onChange={(e) => setUseVariants(e.target.checked)} />
+                <label htmlFor="use-variants" className="font-bold text-blue-800 text-lg">Sản phẩm có nhiều phân loại (dung tích, màu sắc...)</label>
             </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-400 mb-2">
-                Giá gốc (đ)
-              </label>
-              <input
-                type="number"
-                className="w-full p-4 border rounded-xl text-gray-400"
-                value={formData.old_price}
-                onChange={(e) =>
-                  setFormData({ ...formData, old_price: e.target.value })
-                }
-              />
-            </div>
+
+            {/* --- Giao diện cho sản phẩm có phân loại --- */}
+            {useVariants ? (
+                <div className="space-y-3 animate-fade-in">
+                    {variants.map((variant, index) => (
+                        <div key={index} className="grid grid-cols-12 gap-2 items-center p-2 bg-white/50 rounded">
+                            <div className="col-span-5">
+                                <label className="text-xs font-bold text-gray-500">Tên phân loại (*)</label>
+                                <input type="text" placeholder="VD: 100ml" value={variant.name} onChange={(e) => handleVariantChange(index, 'name', e.target.value)} className="w-full p-2 border rounded" required />
+                            </div>
+                            <div className="col-span-3">
+                                <label className="text-xs font-bold text-gray-500">Giá (đ) (*)</label>
+                                <input type="number" placeholder="150000" value={variant.price} onChange={(e) => handleVariantChange(index, 'price', e.target.value)} className="w-full p-2 border rounded" required />
+                            </div>
+                            <div className="col-span-2">
+                                <label className="text-xs font-bold text-gray-500">Tồn kho</label>
+                                <input type="number" placeholder="10" value={variant.stock} onChange={(e) => handleVariantChange(index, 'stock', e.target.value)} className="w-full p-2 border rounded" />
+                            </div>
+                            <div className="col-span-2 flex items-end h-full">
+                                <button type="button" onClick={() => removeVariant(index)} className="bg-red-100 text-red-600 h-10 w-10 rounded font-bold hover:bg-red-200">✕</button>
+                            </div>
+                        </div>
+                    ))}
+                    <button type="button" onClick={addVariant} className="w-full text-sm bg-blue-100 text-blue-700 font-bold py-2 rounded hover:bg-blue-200">+ Thêm phân loại</button>
+                </div>
+            ) : (
+                /* --- Giao diện cho sản phẩm không có phân loại (như cũ) --- */
+                <div className="grid grid-cols-2 gap-6 animate-fade-in">
+                    <div>
+                        <label className="block text-sm font-bold text-red-600 mb-2">
+                            Giá bán (đ)
+                        </label>
+                        <input
+                            type="number"
+                            className="w-full p-4 border rounded-xl font-bold"
+                            value={formData.price}
+                            onChange={(e) =>
+                            setFormData({ ...formData, price: e.target.value })
+                            }
+                            required={!useVariants}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-gray-400 mb-2">
+                            Giá gốc (đ)
+                        </label>
+                        <input
+                            type="number"
+                            className="w-full p-4 border rounded-xl text-gray-400"
+                            value={formData.old_price}
+                            onChange={(e) =>
+                            setFormData({ ...formData, old_price: e.target.value })
+                            }
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* Hiển thị giá và tồn kho được tính toán */}
+            {useVariants && (
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-blue-200">
+                    <div className="text-sm">
+                        <p className="font-bold text-gray-500">Giá bán chính (tự động):</p>
+                        <p className="font-bold text-red-600 text-lg">{Number(formData.price).toLocaleString('vi-VN')}đ</p>
+                    </div>
+                    <div className="text-sm">
+                        <p className="font-bold text-gray-500">Tổng tồn kho (tự động):</p>
+                        <p className="font-bold text-blue-600 text-lg">{formData.stock_quantity}</p>
+                    </div>
+                </div>
+            )}
           </div>
 
-          <div>
+          <div className="border-t pt-6">
             <label className="block text-sm font-bold text-gray-700 mb-2">
               Hình ảnh ({imageItems.length}/6) - Kéo thả để sắp xếp
             </label>

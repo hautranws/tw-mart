@@ -41,12 +41,15 @@ export default function Banner() {
   if (slides.length === 0) return null;
 
   return (
-    <div className="w-full h-48 md:h-[400px] relative overflow-hidden rounded-xl shadow-lg group">
-      {/* Hiển thị ảnh */}
-      <div
-        className="w-full h-full bg-center bg-cover duration-700 transition-all ease-in-out"
-        style={{ backgroundImage: `url(${slides[currentIndex].image_url})` }}
-      ></div>
+    <div className="w-full relative overflow-hidden rounded-xl shadow-lg group">
+      {/* Sử dụng padding-bottom để tạo tỷ lệ 2:1 (height = 50% width) */}
+      <div className="relative pt-[50%]">
+        {/* Hiển thị ảnh, lấp đầy khung tỷ lệ 2:1 */}
+        <div
+          className="absolute inset-0 bg-center bg-cover duration-700 transition-all ease-in-out"
+          style={{ backgroundImage: `url(${slides[currentIndex].image_url})` }}
+        ></div>
+      </div>
 
       {/* Nút lùi (Mũi tên trái) */}
       <div className="hidden group-hover:block absolute top-[50%] -translate-y-1/2 left-5 text-2xl rounded-full p-2 bg-black/20 text-white cursor-pointer hover:bg-black/50 transition">
