@@ -71,7 +71,7 @@ export default function CheckoutPage() {
     .reduce((sum, item) => {
       // [MỚI] Ưu tiên dùng giá của phân loại nếu có
       const price = item.selectedVariant
-        ? item.selectedVariant.price
+        ? Number(item.selectedVariant.price)
         : item.price;
       return sum + price * item.quantity;
     }, 0);
@@ -631,7 +631,7 @@ export default function CheckoutPage() {
                         </p>
                       )}
                       <p className="text-red-600 font-black mb-2">
-                        {item.price.toLocaleString("vi-VN")}đ
+                        {(item.selectedVariant ? Number(item.selectedVariant.price) : item.price).toLocaleString("vi-VN")}đ
                       </p>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm">

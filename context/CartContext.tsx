@@ -8,13 +8,14 @@ type CartItem = {
   price: number;
   quantity: number;
   img: string;
-  name?: string;     
+  name?: string;
   image_url?: string;
+  selectedVariant?: any;
 };
 
 type CartContextType = {
   cart: CartItem[];
-  addToCart: (product: any) => void;
+  addToCart: (product: any, selectedVariant?: any) => void;
   removeFromCart: (id: number) => void;
   updateQuantity: (id: number, newQuantity: number) => void; // <--- MỚI: Hàm chỉnh số lượng
   totalItems: number;
@@ -54,14 +55,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Hàm thêm vào giỏ
-  const addToCart = (product: any) => {
+  const addToCart = (product: any, selectedVariant?: any) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.id === product.id);
       if (existing) {
         return prev.map((item) =>
           item.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
+            ? {
+                ...item,
+                quantity: item.quantity + 1,
+                selectedVariant: selectedVariant || item.selectedVariant,
+              }
+            : item,
         );
       }
       return [
@@ -72,6 +77,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           price: Number(product.price),
           img: getCleanImage(product.img || product.image_url),
           quantity: 1,
+          selectedVariant: selectedVariant || null,
         },
       ];
     });
@@ -83,8 +89,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (newQuantity < 1) return; // Không cho giảm dưới 1
     setCart((prev) =>
       prev.map((item) =>
-        item.id === id ? { ...item, quantity: newQuantity } : item
-      )
+        item.id === id ? { ...item, quantity: newQuantity } : item,
+      ),
     );
   };
 
@@ -94,8 +100,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
   const totalPrice = cart.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
+    (sum, item) =>
+      sum +
+      (item.selectedVariant ? Number(item.selectedVariant.price) : item.price) *
+        item.quantity,
+    0,
   );
 
   return (
