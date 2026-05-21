@@ -27,8 +27,14 @@ export default function EditProductPage({
     is_best_seller: false,
   });
 
-  const [images, setImages] = useState<string[]>([]);
-  const [newFiles, setNewFiles] = useState<File[]>([]);
+  interface ImageItem {
+    id: string;
+    url: string;
+    file?: File;
+  }
+
+  const [imageItems, setImageItems] = useState<ImageItem[]>([]);
+  const [draggedItem, setDraggedItem] = useState<ImageItem | null>(null);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -57,7 +63,11 @@ export default function EditProductPage({
               loadedImages = [data.img];
             }
           }
-          setImages(loadedImages);
+          const loadedImageItems = loadedImages.map((url) => ({
+            id: url, // Use URL as a unique ID for existing images
+            url: url,
+          }));
+          setImageItems(loadedImageItems);
 
           setFormData({
             title: data.title || "",
@@ -87,47 +97,74 @@ export default function EditProductPage({
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    if (images.length + files.length > 6) {
+    if (imageItems.length + files.length > 6) {
       alert("Tối đa 6 ảnh!");
       return;
     }
-    const fileArray = Array.from(files);
-    setNewFiles((prev) => [...prev, ...fileArray]);
-    const newPreviewUrls = fileArray.map((file) => URL.createObjectURL(file));
-    setImages((prev) => [...prev, ...newPreviewUrls]);
+    const newItems: ImageItem[] = Array.from(files).map((file) => ({
+      id: `${file.name}-${file.lastModified}-${Math.random()}`,
+      file: file,
+      url: URL.createObjectURL(file),
+    }));
+    setImageItems((prev) => [...prev, ...newItems]);
   };
 
-  const removeImage = (indexToRemove: number) => {
-    setImages((prev) => prev.filter((_, index) => index !== indexToRemove));
+  const removeImage = (idToRemove: string) => {
+    setImageItems((prev) => prev.filter((item) => item.id !== idToRemove));
+  };
+
+  const handleDragStart = (
+    e: React.DragEvent<HTMLDivElement>,
+    item: ImageItem,
+  ) => {
+    setDraggedItem(item);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (
+    e: React.DragEvent<HTMLDivElement>,
+    targetItem: ImageItem,
+  ) => {
+    e.preventDefault();
+    if (!draggedItem || draggedItem.id === targetItem.id) return;
+
+    const newItems = [...imageItems];
+    const draggedIndex = newItems.findIndex((i) => i.id === draggedItem.id);
+    const targetIndex = newItems.findIndex((i) => i.id === targetItem.id);
+    const [removed] = newItems.splice(draggedIndex, 1);
+    newItems.splice(targetIndex, 0, removed);
+    setImageItems(newItems);
+    setDraggedItem(null);
   };
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setUploading(true);
 
     try {
       const id = params.id;
+      const finalImageUrls: string[] = [];
 
-      let newUploadedUrls: string[] = [];
-      if (newFiles.length > 0) {
-        setUploading(true);
-        for (const file of newFiles) {
+      for (const item of imageItems) {
+        if (item.file) {
+          const file = item.file;
           const fileName = `tw-mart-product-${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
           const { error: uploadError } = await supabase.storage
             .from("tw-mart-products") // Đã đổi sang bucket mới
             .upload(fileName, file);
-          if (!uploadError) {
-            const { data: urlData } = supabase.storage
-              .from("tw-mart-products") // Đã đổi sang bucket mới
-              .getPublicUrl(fileName);
-            newUploadedUrls.push(urlData.publicUrl);
-          }
+          if (uploadError) throw uploadError;
+          const { data: urlData } = supabase.storage
+            .from("tw-mart-products") // Đã đổi sang bucket mới
+            .getPublicUrl(fileName);
+          finalImageUrls.push(urlData.publicUrl);
+        } else {
+          finalImageUrls.push(item.url);
         }
-        setUploading(false);
       }
-
-      const keptOldImages = images.filter((img) => !img.startsWith("blob:"));
-      const finalImages = [...keptOldImages, ...newUploadedUrls];
 
       const payload = {
         title: formData.title,
@@ -140,7 +177,7 @@ export default function EditProductPage({
         description: formData.description,
         stock_quantity: Number(formData.stock_quantity),
         is_best_seller: formData.is_best_seller,
-        img: JSON.stringify(finalImages),
+        img: JSON.stringify(finalImageUrls),
       };
 
       // 👈 CẬP NHẬT VÀO BẢNG ĐÀI LOAN
@@ -265,37 +302,49 @@ export default function EditProductPage({
 
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-2">
-              Hình ảnh ({images.length}/6)
+              Hình ảnh ({imageItems.length}/6) - Kéo thả để sắp xếp
             </label>
-            <div className="flex flex-wrap gap-4 mb-4">
-              {images.map((imgSrc, index) => (
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4 mb-4">
+              {imageItems.map((item, index) => (
                 <div
-                  key={index}
-                  className="relative w-24 h-24 border rounded-lg overflow-hidden shadow-sm"
+                  key={item.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, item)}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, item)}
+                  className="relative group aspect-square border rounded-lg overflow-hidden shadow-sm cursor-move"
                 >
-                  <img src={imgSrc} className="w-full h-full object-cover" />
+                  <img
+                    src={item.url}
+                    alt={`Ảnh sản phẩm ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-0 left-0 bg-black/50 text-white text-xs px-1.5 py-0.5 font-bold rounded-br-lg">
+                    #{index + 1}
+                  </div>
                   <button
                     type="button"
-                    onClick={() => removeImage(index)}
-                    className="absolute top-0 right-0 bg-red-500 text-white w-6 h-6 flex items-center justify-center text-xs"
+                    onClick={() => removeImage(item.id)}
+                    className="absolute top-0 right-0 bg-red-500 text-white w-6 h-6 rounded-bl-lg flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Xóa ảnh này"
                   >
                     ✕
                   </button>
                 </div>
               ))}
-              {images.length < 6 && (
-                <label className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer hover:bg-gray-50 text-2xl text-gray-300">
+              {imageItems.length < 6 && (
+                <label className="aspect-square border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer hover:bg-gray-50 text-3xl text-gray-400 hover:text-gray-500">
                   +
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
                 </label>
               )}
             </div>
-            <input
-              type="file"
-              multiple
-              accept="image/*"
-              onChange={handleImageUpload}
-              className="hidden"
-            />
           </div>
 
           <div className="flex items-center gap-4 bg-red-50 p-4 rounded-xl border border-red-100">

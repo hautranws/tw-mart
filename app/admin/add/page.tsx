@@ -6,8 +6,14 @@ import Link from "next/link";
 export default function AddProductPage() {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+
+  interface ImageItem {
+    id: string;
+    file: File;
+    previewUrl: string;
+  }
+  const [imageItems, setImageItems] = useState<ImageItem[]>([]);
+  const [draggedItem, setDraggedItem] = useState<ImageItem | null>(null);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -26,12 +32,48 @@ export default function AddProductPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      const fileArray = Array.from(files).slice(0, 6);
-      setSelectedFiles(fileArray);
-      // Tạo preview
-      const urls = fileArray.map((file) => URL.createObjectURL(file));
-      setPreviewUrls(urls);
+      if (imageItems.length + files.length > 6) {
+        alert("Tối đa 6 ảnh!");
+        return;
+      }
+      const newItems = Array.from(files).map((file) => ({
+        id: `${file.name}-${file.lastModified}-${Math.random()}`,
+        file: file,
+        previewUrl: URL.createObjectURL(file),
+      }));
+      setImageItems((prev) => [...prev, ...newItems]);
     }
+  };
+
+  const removeImage = (id: string) => {
+    setImageItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleDragStart = (
+    e: React.DragEvent<HTMLDivElement>,
+    item: ImageItem,
+  ) => {
+    setDraggedItem(item);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (
+    e: React.DragEvent<HTMLDivElement>,
+    targetItem: ImageItem,
+  ) => {
+    e.preventDefault();
+    if (!draggedItem || draggedItem.id === targetItem.id) return;
+
+    const newItems = [...imageItems];
+    const draggedIndex = newItems.findIndex((i) => i.id === draggedItem.id);
+    const targetIndex = newItems.findIndex((i) => i.id === targetItem.id);
+    const [removed] = newItems.splice(draggedIndex, 1);
+    newItems.splice(targetIndex, 0, removed);
+    setImageItems(newItems);
+    setDraggedItem(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -48,11 +90,12 @@ export default function AddProductPage() {
       let finalImageString = "";
 
       // --- XỬ LÝ UPLOAD ẢNH LÊN STORAGE ---
-      if (selectedFiles.length > 0) {
+      if (imageItems.length > 0) {
         setUploading(true);
         const uploadedUrls: string[] = [];
 
-        for (const file of selectedFiles) {
+        for (const item of imageItems) {
+          const file = item.file;
           // Tạo tên file độc nhất để tránh bị ghi đè
           const fileExt = file.name.split(".").pop();
           const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
@@ -243,28 +286,48 @@ export default function AddProductPage() {
 
           {/* UPLOAD ẢNH */}
           <div className="border-2 border-dashed border-red-200 p-8 rounded-2xl text-center bg-red-50/20">
-            <label className="block text-sm font-bold text-gray-700 mb-4 flex items-center justify-center gap-2">
-              📸 Tải ảnh lên Storage (Tối đa 6 ảnh)
+            <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center justify-center gap-2">
+              📸 Hình ảnh sản phẩm (Tối đa 6 ảnh)
             </label>
+            <p className="text-xs text-gray-500 mb-4">
+              Ảnh đầu tiên sẽ là ảnh đại diện. Kéo thả để sắp xếp thứ tự.
+            </p>
             <input
               type="file"
               accept="image/*"
               multiple
               onChange={handleFileChange}
               className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-red-700 hover:file:bg-red-100 cursor-pointer"
+              disabled={imageItems.length >= 6}
             />
 
-            {previewUrls.length > 0 && (
-              <div className="flex flex-wrap justify-center gap-3 mt-6">
-                {previewUrls.map((url, i) => (
+            {imageItems.length > 0 && (
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4 mt-6">
+                {imageItems.map((item, i) => (
                   <div
-                    key={i}
-                    className="relative group shadow-md rounded-lg overflow-hidden border-2 border-white"
+                    key={item.id}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, item)}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, item)}
+                    className="relative group aspect-square shadow-md rounded-lg overflow-hidden border-2 border-white cursor-move"
                   >
-                    <img src={url} className="w-24 h-24 object-cover" />
-                    <div className="absolute top-0 right-0 bg-red-600 text-white text-[10px] px-1.5 py-0.5 font-bold">
+                    <img
+                      src={item.previewUrl}
+                      alt={`Preview ${i + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-0 left-0 bg-black/50 text-white text-xs px-1.5 py-0.5 font-bold rounded-br-lg">
                       #{i + 1}
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => removeImage(item.id)}
+                      className="absolute top-0 right-0 bg-red-600 text-white w-6 h-6 rounded-bl-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Xóa ảnh này"
+                    >
+                      ✕
+                    </button>
                   </div>
                 ))}
               </div>
