@@ -131,24 +131,41 @@ export async function POST(req: Request) {
     let userId = clientUserId;
     let isNewUser = false;
 
+    // [SỬA LỖI] Logic xử lý khách vãng lai (không đăng nhập)
     if (!userId) {
       let formattedPhone = phone.trim();
-      if (formattedPhone.startsWith("0"))
+      if (formattedPhone.startsWith("0")) {
         formattedPhone = "84" + formattedPhone.substring(1);
-      formattedPhone = formattedPhone.replace("+", "");
-      const randomPassword = Math.random().toString(36).slice(-8) + "Aa1@";
+      }
+      formattedPhone = formattedPhone.replace(/\D/g, ""); // Xóa các ký tự không phải số
 
-      const { data: newUser, error: createError } =
-        await supabaseAdmin.auth.admin.createUser({
-          phone: formattedPhone,
-          password: randomPassword,
-          email_confirm: true,
-          phone_confirm: true,
-          user_metadata: { full_name: name, address: address, phone: phone },
-        });
+      // 1. Tìm kiếm xem SĐT đã tồn tại trong hệ thống chưa
+      const {
+        data: { users },
+        error: listError,
+      } = await supabaseAdmin.auth.admin.listUsers();
+      if (listError)
+        throw new Error(`Lỗi tìm kiếm người dùng: ${listError.message}`);
 
-      if (!createError && newUser) {
-        userId = newUser.user.id;
+      const existingUser = users.find((u) => u.phone === formattedPhone);
+
+      if (existingUser) {
+        // Nếu SĐT đã tồn tại, dùng luôn ID của user đó cho đơn hàng
+        userId = existingUser.id;
+      } else {
+        // Nếu SĐT chưa có, tạo tài khoản mới
+        const randomPassword = Math.random().toString(36).slice(-8) + "Aa1@";
+        const { data: newUser, error: createError } =
+          await supabaseAdmin.auth.admin.createUser({
+            phone: formattedPhone,
+            password: randomPassword,
+            phone_confirm: true,
+            user_metadata: { full_name: name, address: address, phone: phone },
+          });
+
+        if (createError)
+          throw new Error(`Lỗi tạo tài khoản: ${createError.message}`);
+        userId = newUser!.user.id;
         isNewUser = true;
       }
     }

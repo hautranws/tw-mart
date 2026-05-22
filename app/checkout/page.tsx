@@ -479,43 +479,6 @@ export default function CheckoutPage() {
       return;
     }
 
-    // --- LOGIC MỚI: TỰ ĐỘNG TẠO/LẤY TÀI KHOẢN CHO KHÁCH VÃNG LAI ---
-    let userIdForOrder = user?.id;
-
-    // Nếu là khách vãng lai (chưa đăng nhập) và có nhập SĐT
-    if (!user && formValues.phone.trim()) {
-      try {
-        let formattedPhone = formValues.phone.trim();
-        if (formattedPhone.startsWith("0")) {
-          formattedPhone = "+84" + formattedPhone.substring(1);
-        }
-        const fakeEmail = `${formattedPhone}@twmart.com`;
-        const tempPassword = Math.random().toString(36).slice(-10);
-
-        // Thử đăng ký tài khoản mới.
-        // Supabase sẽ báo lỗi nếu SĐT/email đã tồn tại, nhưng sẽ không trả về user.
-        // Đây là giới hạn khi làm ở client, nhưng vẫn đáp ứng yêu cầu tự tạo tài khoản cho đơn đầu.
-        const { data: signUpData } = await supabase.auth.signUp({
-          email: fakeEmail,
-          password: tempPassword,
-          options: { data: { full_name: formValues.fullName } },
-        });
-
-        if (signUpData.user) {
-          userIdForOrder = signUpData.user.id;
-          // Cập nhật SĐT cho tài khoản vừa tạo
-          await supabase.auth.updateUser({ phone: formattedPhone });
-        }
-        // Nếu có lỗi (vd: user đã tồn tại), ta bỏ qua và đặt hàng như guest (userIdForOrder = null)
-      } catch (accountError) {
-        console.warn(
-          "Lỗi tự động tạo tài khoản (có thể bỏ qua):",
-          accountError,
-        );
-      }
-    }
-    // --- KẾT THÚC LOGIC MỚI ---
-
     const selectedStore = pharmacyLocations.find(
       (s) => s.id === selectedStoreId,
     );
@@ -562,8 +525,8 @@ export default function CheckoutPage() {
           subTotal: subTotal,
           couponCode: appliedCoupon ? (appliedCoupon as any).code : null,
           customer: orderInfo,
-          paymentMethod: paymentMethod,
-          userId: userIdForOrder, // Sử dụng ID mới hoặc ID của user đã đăng nhập
+          paymentMethod: paymentMethod, // Chỉ gửi ID của user đã đăng nhập, nếu là khách thì để null
+          userId: user?.id,
         }),
       });
       const data = await response.json();
