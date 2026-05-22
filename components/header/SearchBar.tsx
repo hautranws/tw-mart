@@ -1,272 +1,191 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-
-// 👇 ĐÃ THÊM: Danh sách từ khóa xách tay Đài Loan của shop bạn
-const HOT_KEYWORDS = [
-  "Dầu Metholanum",
-  "Green Oil",
-  "Cao dán Kim Môn",
-  "Dầu xoa bóp Chinpai",
-  "Vaseline 600ml",
-  "Mặt nạ"
-];
+import Link from "next/link";
+import { Search, Loader2, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function SearchBar() {
-  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const searchContainerRef = useRef<HTMLDivElement>(null);
-  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [results, setResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
+  // Tự động đóng dropdown khi click chuột ra ngoài vùng search
   useEffect(() => {
-    const savedHistory = localStorage.getItem("searchHistory");
-    if (savedHistory) {
-      setSearchHistory(JSON.parse(savedHistory));
-    }
-
-    const handleClickOutside = (event: MouseEvent) => {
+    function handleClickOutside(event: MouseEvent) {
       if (
-        searchContainerRef.current &&
-        !searchContainerRef.current.contains(event.target as Node)
+        wrapperRef.current &&
+        !wrapperRef.current.contains(event.target as Node)
       ) {
-        setShowSuggestions(false);
+        setShowDropdown(false);
       }
-    };
+    }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const addToHistory = (term: string) => {
-    let newHistory = [term, ...searchHistory.filter((item) => item !== term)];
-    newHistory = newHistory.slice(0, 5);
-    setSearchHistory(newHistory);
-    localStorage.setItem("searchHistory", JSON.stringify(newHistory));
-  };
-
-  const removeFromHistory = (e: React.MouseEvent, term: string) => {
-    e.stopPropagation();
-    const newHistory = searchHistory.filter((item) => item !== term);
-    setSearchHistory(newHistory);
-    localStorage.setItem("searchHistory", JSON.stringify(newHistory));
-  };
-
-  const clearHistory = () => {
-    setSearchHistory([]);
-    localStorage.removeItem("searchHistory");
-  };
-
+  // THÔNG MINH 1: Debounce (Trì hoãn) việc gọi API
+  // Tránh việc gõ 10 chữ gọi API 10 lần làm sập máy chủ. Chờ 300ms gõ xong mới gọi.
   useEffect(() => {
-    const delayDebounceFn = setTimeout(async () => {
-      if (searchTerm.length > 1) {
-        const { data } = await supabase
-          .from("products")
-          .select("id, title, price, img, old_price")
-          .ilike("title", `%${searchTerm}%`)
-          .limit(5);
-
-        if (data) setSuggestions(data);
+    const delayDebounceFn = setTimeout(() => {
+      if (searchTerm.trim().length >= 2) {
+        performSearch(searchTerm.trim());
       } else {
-        setSuggestions([]);
+        setResults([]);
+        setShowDropdown(false);
       }
-    }, 400);
+    }, 300);
+
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm]);
 
-  const handleSearch = () => {
-    if (searchTerm.trim()) {
-      addToHistory(searchTerm.trim());
-      setShowSuggestions(false);
-      router.push(`/search?q=${encodeURIComponent(searchTerm)}`);
+  const performSearch = async (query: string) => {
+    setIsSearching(true);
+    setShowDropdown(true);
+
+    // Truy vấn dữ liệu từ bảng products_tw
+    const { data, error } = await supabase
+      .from("products_tw")
+      .select("id, title, img, price, brand, description")
+      // [NÂNG CẤP] Tìm kiếm thông minh ở cả tên, thương hiệu và mô tả
+      .or(
+        `title.ilike.%${query}%,brand.ilike.%${query}%,description.ilike.%${query}%`,
+      )
+      .limit(5); // Chỉ hiển thị 5 kết quả đầu tiên cho mượt
+
+    if (!error && data) {
+      setResults(data);
+    } else {
+      setResults([]);
     }
+    setIsSearching(false);
   };
 
-  const handleHistoryClick = (term: string) => {
-    setSearchTerm(term);
-    addToHistory(term);
-    setShowSuggestions(false);
-    router.push(`/search?q=${encodeURIComponent(term)}`);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") handleSearch();
-  };
-
-  const getProductImage = (imgData: any) => {
-    if (!imgData) return null; 
+  // Helper để lấy ảnh đầu tiên an toàn
+  const getThumbnail = (imgData: string) => {
+    if (!imgData) return "https://via.placeholder.com/50";
     try {
-      if (imgData.startsWith("[")) {
-        const parsed = JSON.parse(imgData);
-        return parsed[0];
-      }
-      return imgData;
+      const parsed = JSON.parse(imgData);
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : imgData;
     } catch {
       return imgData;
     }
   };
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchTerm.trim()) {
+      setShowDropdown(false);
+      // Chuyển hướng sang trang hiển thị tất cả kết quả
+      router.push(`/search?q=${encodeURIComponent(searchTerm.trim())}`);
+    }
+  };
+
   return (
-    <div
-      ref={searchContainerRef}
-      className="hidden md:block flex-1 max-w-3xl mx-4 relative"
-    >
-      <div className="relative w-full">
+    <div ref={wrapperRef} className="relative w-full z-50">
+      <form onSubmit={handleSubmit} className="relative flex items-center">
         <input
           type="text"
-          // 👇 ĐÃ SỬA: Đổi chữ mờ (Placeholder) cho chuẩn hàng tiêu dùng
-          placeholder="Tìm tên sản phẩm, thương hiệu, công dụng..."
-          className="w-full py-3 px-6 rounded-full text-black outline-none shadow-lg bg-white text-base border border-black"
+          placeholder="Nhập tên sản phẩm, thương hiệu cần tìm..."
+          className="w-full bg-gray-100 border border-gray-200 rounded-full py-2.5 pl-5 pr-20 text-sm text-gray-800 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all shadow-inner"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onFocus={() => setShowSuggestions(true)}
+          onFocus={() => {
+            if (results.length > 0 || isSearching) setShowDropdown(true);
+          }}
         />
+
+        {/* THÔNG MINH 2: Nút xóa text (hiện khi có chữ) */}
+        {searchTerm && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearchTerm("");
+              setResults([]);
+              setShowDropdown(false);
+            }}
+            className="absolute right-12 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition"
+          >
+            <X size={18} />
+          </button>
+        )}
+
+        {/* Nút Kính lúp / Cập nhật trạng thái xoay Loading */}
         <button
-          onClick={handleSearch}
-          className="absolute right-1 top-1 bottom-1 bg-blue-800 px-6 rounded-full hover:bg-blue-900 transition flex items-center justify-center"
+          type="submit"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center bg-blue-700 text-white rounded-full hover:bg-blue-800 hover:shadow-md transition"
         >
-          🔍
+          {isSearching ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Search size={16} />
+          )}
         </button>
-      </div>
+      </form>
 
-      {showSuggestions && (
-        <div className="absolute top-full mt-2 left-0 w-full bg-white rounded-lg shadow-2xl border border-gray-100 overflow-hidden z-[100] animate-fade-in text-gray-800">
-          {searchTerm.length < 2 && searchHistory.length > 0 && (
-            <div className="border-b border-gray-100">
-              <div className="flex justify-between items-center bg-gray-50 px-4 py-2">
-                <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">
-                  Lịch sử tìm kiếm
-                </span>
-                <span
-                  onClick={clearHistory}
-                  className="text-xs text-blue-600 cursor-pointer hover:underline"
-                >
-                  Xóa tất cả
-                </span>
-              </div>
-              <div>
-                {searchHistory.map((term, index) => (
-                  <div
-                    key={index}
-                    onClick={() => handleHistoryClick(term)}
-                    className="flex items-center justify-between px-4 py-2 hover:bg-blue-50 cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-3 text-gray-700">
-                      <span className="text-gray-400 text-lg">🕒</span>
-                      <span>{term}</span>
-                    </div>
-                    <button
-                      onClick={(e) => removeFromHistory(e, term)}
-                      className="text-gray-300 hover:text-red-500 px-2"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
+      {/* THÔNG MINH 3: DROPDOWN HIỂN THỊ KẾT QUẢ TÌM KIẾM TRỰC TIẾP */}
+      {showDropdown && searchTerm.trim().length >= 2 && (
+        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-xl shadow-2xl overflow-hidden animate-fade-in-up">
+          {isSearching ? (
+            <div className="p-6 text-center text-sm text-gray-500 flex flex-col items-center justify-center gap-2">
+              <Loader2 size={24} className="animate-spin text-blue-500" />
+              Đang tìm kiếm...
             </div>
-          )}
-
-          {searchTerm.length < 2 && (
-            <div className="p-4 bg-white">
-              <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
-                Tra cứu hàng đầu
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {/* 👇 ĐÃ SỬA: Map theo list HOT_KEYWORDS mới */}
-                {HOT_KEYWORDS.map((tag, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleHistoryClick(tag)}
-                    className="px-3 py-1 bg-gray-100 hover:bg-blue-100 text-gray-700 hover:text-blue-700 text-sm rounded-full transition border border-gray-200"
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {searchTerm.length > 1 && suggestions.length > 0 && (
-            <div>
-              <div className="bg-gray-50 px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wide border-b">
+          ) : results.length > 0 ? (
+            <div className="flex flex-col max-h-[70vh] overflow-y-auto">
+              <div className="px-4 py-2 bg-gray-50 text-xs font-bold text-gray-500 uppercase">
                 Sản phẩm gợi ý
               </div>
-              <div className="max-h-[400px] overflow-y-auto">
-                {suggestions.map((product) => {
-                   const displayImg = getProductImage(product.img);
-                   return (
-                      <Link
-                        key={product.id}
-                        href={`/product/${product.id}`}
-                        onClick={() => {
-                          addToHistory(product.title);
-                          setShowSuggestions(false);
-                        }}
-                        className="flex items-center gap-4 p-3 hover:bg-blue-50 transition border-b border-gray-50 last:border-0 group"
-                      >
-                        <div className="w-12 h-12 border rounded bg-white flex items-center justify-center shrink-0">
-                          {displayImg ? (
-                            <img
-                              src={displayImg}
-                              alt={product.title}
-                              className="w-full h-full object-contain p-1"
-                            />
-                          ) : (
-                            <span className="text-xl">📦</span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-medium text-gray-800 group-hover:text-blue-700 truncate">
-                            {product.title}
-                          </h4>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-blue-600 font-bold text-sm">
-                              {product.price?.toLocaleString("vi-VN")}đ
-                            </span>
-                            {product.old_price && (
-                              <span className="text-gray-400 text-xs line-through">
-                                {product.old_price.toLocaleString("vi-VN")}đ
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </Link>
-                   );
-                })}
-              </div>
-              <div
-                onClick={handleSearch}
-                className="block text-center py-2 text-sm text-blue-600 hover:bg-blue-50 hover:underline border-t cursor-pointer font-medium"
+              {results.map((product) => (
+                <Link
+                  key={product.id}
+                  href={`/product/${product.id}`}
+                  onClick={() => setShowDropdown(false)}
+                  className="flex items-center gap-3 p-3 hover:bg-blue-50 border-b border-gray-50 last:border-0 transition group"
+                >
+                  <div className="w-12 h-12 bg-white border border-gray-100 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center p-1">
+                    <img
+                      src={getThumbnail(product.img)}
+                      alt={product.title}
+                      className="max-w-full max-h-full object-contain group-hover:scale-110 transition duration-300"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 line-clamp-2 group-hover:text-blue-700 transition">
+                      {product.title}
+                    </p>
+                    <p className="text-sm font-bold text-red-600 mt-0.5">
+                      {Number(product.price).toLocaleString("vi-VN")}đ
+                    </p>
+                  </div>
+                </Link>
+              ))}
+              <Link
+                href={`/search?q=${encodeURIComponent(searchTerm)}`}
+                onClick={() => setShowDropdown(false)}
+                className="p-3 text-center text-sm text-blue-700 font-bold hover:bg-blue-100 transition border-t border-gray-100 bg-blue-50"
               >
-                Xem tất cả kết quả cho "{searchTerm}"
-              </div>
+                Xem tất cả kết quả cho "{searchTerm}" &rarr;
+              </Link>
             </div>
-          )}
-
-          {searchTerm.length > 1 && suggestions.length === 0 && (
-            <div className="p-4 text-center text-gray-500 italic">
-              Không tìm thấy sản phẩm nào khớp với "{searchTerm}"
+          ) : (
+            <div className="p-8 text-center flex flex-col items-center justify-center">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 mb-3">
+                <Search size={24} />
+              </div>
+              <p className="text-gray-800 font-bold mb-1">
+                Không tìm thấy sản phẩm nào
+              </p>
+              <p className="text-xs text-gray-500">
+                Vui lòng thử lại với từ khóa khác hoặc kiểm tra lỗi chính tả.
+              </p>
             </div>
           )}
         </div>
       )}
-
-      <div className="flex items-center gap-4 mt-3 overflow-x-auto whitespace-nowrap text-sm text-black font-medium hide-scrollbar">
-        {/* 👇 ĐÃ SỬA: Map theo list HOT_KEYWORDS mới ở dưới thanh tìm kiếm */}
-        {HOT_KEYWORDS.map((tag, index) => (
-          <button
-            key={index}
-            onClick={() => handleHistoryClick(tag)}
-            className="hover:underline hover:text-blue-700 transition-colors opacity-90 hover:opacity-100"
-          >
-            {tag}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }

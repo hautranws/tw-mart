@@ -3,9 +3,6 @@ import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
 import nodemailer from "nodemailer";
 
 // Giữ nguyên các hàm import thanh toán của bạn
-import { createVNPayUrl } from "../../../../lib/payment/vnpay";
-import { createMoMoUrl } from "../../../../lib/payment/momo";
-import { createPayOSLink } from "../../../../lib/payment/payos";
 
 // ==================================================================
 // ⚙️ CẤU HÌNH GỬI THÔNG BÁO (TWMED - SIÊU THỊ HÀNG ĐÀI LOAN)
@@ -13,7 +10,7 @@ import { createPayOSLink } from "../../../../lib/payment/payos";
 
 const EMAIL_CONFIG = {
   user: "thienduoc.thienhau@gmail.com",
-  pass: "raew vtrg lkda ocwd",
+  pass: "raewvtrglkdaocwd", // Đã xóa khoảng trắng ở mật khẩu ứng dụng để tránh lỗi
   staffEmail: "hautranws@gmail.com,phamanhthu1804@gmail.com",
 };
 
@@ -33,13 +30,49 @@ export async function POST(req: Request) {
     const { name, phone, address, note } = customer;
 
     // --- BƯỚC 0: TÍNH TOÁN LẠI GIÁ & MÃ GIẢM GIÁ ---
-    // [MỚI] Tính lại subtotal, ưu tiên giá của variant
+    // [AN TOÀN HƠN] Lấy ID sản phẩm và ID biến thể từ giỏ hàng của khách
+    const productIds = items.map((item: any) => item.id);
+
+    // Truy vấn DB để lấy giá gốc và giá biến thể chính xác
+    const { data: productsData, error: productsError } = await supabaseAdmin
+      .from("products_tw")
+      .select("id, price, variants")
+      .in("id", productIds);
+
+    if (productsError) throw productsError;
+
+    // Tạo một bản đồ giá để tra cứu nhanh và an toàn
+    const priceMap = new Map<string, number>();
+    productsData.forEach((p) => {
+      // Giá gốc
+      priceMap.set(`product-${p.id}`, p.price);
+      // Giá các biến thể
+      if (p.variants) {
+        try {
+          const variants = JSON.parse(p.variants);
+          if (Array.isArray(variants)) {
+            variants.forEach((v) => {
+              // Giả sử mỗi biến thể có id và price duy nhất
+              if (v.name && v.price) {
+                priceMap.set(`variant-${p.id}-${v.name}`, v.price);
+              }
+            });
+          }
+        } catch {}
+      }
+    });
+
+    // [AN TOÀN] Tính lại tổng tiền trên server dựa vào giá từ DB
     const serverSubTotal = items.reduce((sum: number, item: any) => {
-      // Quan trọng: Lấy giá từ phân loại đã chọn nếu có, nếu không thì lấy giá gốc.
-      // Cần có bước xác thực giá này với DB ở môi trường production để đảm bảo an toàn
-      const price = item.selectedVariant
-        ? item.selectedVariant.price
-        : item.price;
+      let price = 0;
+      if (item.selectedVariant && item.selectedVariant.name) {
+        price =
+          priceMap.get(`variant-${item.id}-${item.selectedVariant.name}`) ||
+          priceMap.get(`product-${item.id}`) ||
+          0;
+      } else {
+        price = priceMap.get(`product-${item.id}`) || 0;
+      }
       return sum + price * item.quantity;
     }, 0);
 
@@ -140,98 +173,66 @@ export async function POST(req: Request) {
 
     if (orderError) throw orderError;
 
+    const orderId = orderData.id; // Khai báo orderId một lần duy nhất ở đây
+
     // ==================================================================
     // 🔥 GỬI THÔNG BÁO CHO CHỦ SHOP (TWMED)
     // ==================================================================
-    (async () => {
-      try {
-        const orderId = orderData.id;
-        const totalStr = finalAmount.toLocaleString("vi-VN");
+    try {
+      const totalStr = finalAmount.toLocaleString("vi-VN");
+      if (EMAIL_CONFIG.user && EMAIL_CONFIG.pass) {
+        const transporter = nodemailer.createTransport({
+          host: "smtp.gmail.com",
+          port: 465,
+          secure: true,
+          auth: { user: EMAIL_CONFIG.user, pass: EMAIL_CONFIG.pass },
+        });
 
-        if (EMAIL_CONFIG.user && EMAIL_CONFIG.pass) {
-          const transporter = nodemailer.createTransport({
-            service: "gmail",
-            auth: { user: EMAIL_CONFIG.user, pass: EMAIL_CONFIG.pass },
-          });
+        const itemsHtml = items
+          .map(
+            (item: any) =>
+              `<li>${item.title || item.name} - SL: <b>${item.quantity}</b></li>`,
+          )
+          .join("");
 
-          const itemsHtml = items
-            .map(
-              (item: any) =>
-                `<li>${item.title || item.name} - SL: <b>${item.quantity}</b></li>`,
-            )
-            .join("");
-
-          let couponHtml = "";
-          if (discountAmount > 0) {
-            couponHtml = `<p style="color: green; font-size: 14px;"><b>🎁 Đã dùng mã:</b> ${appliedCouponCode} (Giảm ${discountAmount.toLocaleString()}đ)</p>`;
-          }
-
-          const mailOptions = {
-            from: `"TWMED - Đơn Hàng Mới" <${EMAIL_CONFIG.user}>`,
-            to: EMAIL_CONFIG.staffEmail,
-            subject: `🇹🇼 ĐƠN ĐÀI LOAN MỚI - Khách: ${name} - ${totalStr}đ`,
-            html: `
-              <div style="font-family: Arial, sans-serif; padding: 20px; border: 2px solid #ed1c24; border-radius: 8px; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #00205b; border-bottom: 2px solid #ed1c24; padding-bottom: 10px;">📦 ĐƠN HÀNG TỪ TWMED!</h2>
-                <p><b>Khách hàng:</b> ${name}</p>
-                <p><b>Điện thoại:</b> ${phone}</p>
-                <p><b>Địa chỉ:</b> ${address}</p>
-                <p><b>Ghi chú:</b> <i>${note || "Không có"}</i></p>
-                <h3 style="background-color: #f3f4f6; padding: 10px;">🛒 Sản phẩm order:</h3>
-                {/* [MỚI] Hiển thị cả phân loại trong email */}
-                <ul>${items.map((item: any) => `<li>${item.title || item.name} ${item.selectedVariant ? `(<b>${item.selectedVariant.name}</b>)` : ""} - SL: <b>${item.quantity}</b></li>`).join("")}</ul>
-                <p style="margin-top: 15px;">Giá gốc: ${serverSubTotal.toLocaleString()}đ</p>
-                ${couponHtml}
-                <h3 style="color: #dc2626; font-size: 20px; border-top: 1px dashed #ccc; padding-top: 15px;">
-                  TỔNG THANH TOÁN: ${totalStr} VNĐ
-                </h3>
-              </div>`,
-          };
-          await transporter.sendMail(mailOptions);
+        let couponHtml = "";
+        if (discountAmount > 0) {
+          couponHtml = `<p style="color: green; font-size: 14px;"><b>🎁 Đã dùng mã:</b> ${appliedCouponCode} (Giảm ${discountAmount.toLocaleString()}đ)</p>`;
         }
-      } catch (err) {
-        console.error("Thông báo lỗi:", err);
+
+        const mailOptions = {
+          from: `"TWMED - Đơn Hàng Mới" <${EMAIL_CONFIG.user}>`,
+          to: EMAIL_CONFIG.staffEmail,
+          subject: `🇹🇼 ĐƠN ĐÀI LOAN MỚI - Khách: ${name} - ${totalStr}đ`,
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; border: 2px solid #ed1c24; border-radius: 8px; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #00205b; border-bottom: 2px solid #ed1c24; padding-bottom: 10px;">📦 ĐƠN HÀNG TỪ TWMED!</h2>
+              <p><b>Khách hàng:</b> ${name}</p>
+              <p><b>Điện thoại:</b> ${phone}</p>
+              <p><b>Địa chỉ:</b> ${address}</p>
+              <p><b>Ghi chú:</b> <i>${note || "Không có"}</i></p>
+              <h3 style="background-color: #f3f4f6; padding: 10px;">🛒 Sản phẩm order:</h3>
+              {/* [MỚI] Hiển thị cả phân loại trong email */}
+              <ul>${items.map((item: any) => `<li>${item.title || item.name} ${item.selectedVariant ? `(<b>${item.selectedVariant.name}</b>)` : ""} - SL: <b>${item.quantity}</b></li>`).join("")}</ul>
+              <p style="margin-top: 15px;">Giá gốc: ${serverSubTotal.toLocaleString()}đ</p>
+              ${couponHtml}
+              <h3 style="color: #dc2626; font-size: 20px; border-top: 1px dashed #ccc; padding-top: 15px;">
+                TỔNG THANH TOÁN: ${totalStr} VNĐ
+              </h3>
+            </div>`,
+        };
+        await transporter.sendMail(mailOptions);
       }
-    })();
-
-    // --- BƯỚC 3: TRẢ LINK THANH TOÁN ---
-    let paymentUrl = "";
-    const orderId = orderData.id;
-    const orderInfo = `Thanh toan don TWMED #${orderId}`;
-
-    switch (paymentMethod) {
-      case "VNPAY":
-      case "ATM":
-      case "VISA":
-        paymentUrl = createVNPayUrl({
-          orderId,
-          amount: finalAmount,
-          orderInfo,
-        });
-        break;
-      case "MOMO":
-        paymentUrl = await createMoMoUrl({
-          orderId,
-          amount: finalAmount,
-          orderInfo,
-        });
-        break;
-      case "BANK":
-      case "PAYOS":
-        const payOSData = await createPayOSLink({
-          orderId: Math.floor(Date.now() / 1000),
-          amount: finalAmount,
-          description: orderInfo,
-        });
-        paymentUrl = payOSData.checkoutUrl;
-        break;
+    } catch (err) {
+      console.error("Thông báo lỗi gửi mail:", err);
     }
 
+    // --- BƯỚC 3: TRẢ VỀ KẾT QUẢ ĐƠN HÀNG (COD) ---
     return NextResponse.json({
       success: true,
       orderId,
       isNewUser,
-      url: paymentUrl,
+      url: "", // Đã xóa các hình thức thanh toán online nên url rỗng
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -1,48 +1,7 @@
 import React from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
-
-// Component hiển thị từng sản phẩm (Giữ nguyên)
-const ProductItem = ({ product }: { product: any }) => (
-  <Link
-    href={`/product/${product.id}`}
-    className="block group bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-lg transition overflow-hidden"
-  >
-    <div className="relative h-48 w-full bg-gray-50 flex items-center justify-center p-4">
-      {product.discount && (
-        <span className="absolute top-2 left-2 bg-red-500 text-white text-[10px] px-2 py-1 rounded font-bold z-10">
-          {product.discount}
-        </span>
-      )}
-      <div className="h-40 w-full flex items-center justify-center overflow-hidden">
-        {product.img ? (
-          <img
-            src={product.img}
-            alt={product.title}
-            className="h-full w-full object-contain group-hover:scale-105 transition-transform duration-300"
-          />
-        ) : (
-          <span className="text-4xl">📦</span>
-        )}
-      </div>
-    </div>
-    <div className="p-4">
-      <h3 className="font-bold text-gray-800 text-sm line-clamp-2 mb-2 min-h-[40px] group-hover:text-blue-700 transition-colors">
-        {product.title}
-      </h3>
-      <div className="flex items-baseline gap-2">
-        <span className="text-blue-600 font-bold text-lg">
-          {product.price?.toLocaleString("vi-VN")}đ
-        </span>
-        {product.old_price && (
-          <span className="text-gray-400 text-xs line-through">
-            {product.old_price.toLocaleString("vi-VN")}đ
-          </span>
-        )}
-      </div>
-    </div>
-  </Link>
-);
+import ProductCard from "@/components/ProductCard"; // [SỬA] Dùng component ProductCard chung
 
 // --- PHẦN CHÍNH (ĐÃ SỬA LỖI) ---
 export default async function SearchPage({
@@ -53,13 +12,13 @@ export default async function SearchPage({
 }) {
   // 1. Dùng await để lấy dữ liệu từ URL
   const resolvedSearchParams = await searchParams;
-  const query = resolvedSearchParams.q || ""; // Lấy từ khóa 'q'
+  const query = String(resolvedSearchParams.q || ""); // Lấy từ khóa 'q'
 
   // 2. Tìm trong Supabase
   let products = [];
   if (query) {
     const { data, error } = await supabase
-      .from("products")
+      .from("products_tw") // [SỬA LỖI] Gọi đúng bảng products_tw
       .select("*")
       .ilike("title", `%${query}%`); // Tìm kiếm gần đúng
 
@@ -81,9 +40,9 @@ export default async function SearchPage({
 
         {/* Danh sách sản phẩm tìm thấy */}
         {products.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {products.map((product) => (
-              <ProductItem key={product.id} product={product} />
+              <ProductCard key={product.id} product={product} />
             ))}
           </div>
         ) : (
