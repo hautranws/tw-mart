@@ -151,7 +151,11 @@ export default function FlashSale() {
           } catch (e) {}
 
           const idString = String(item.id);
-          const randomSold = (idString.charCodeAt(0) % 50) + 40;
+          const hash = idString
+            .split("")
+            .reduce((a, c) => a + c.charCodeAt(0), 0);
+          const randomSold = (hash % 150) + 120;
+          const randomRating = 4 + (hash % 10) / 10;
 
           return (
             <Link
@@ -177,15 +181,31 @@ export default function FlashSale() {
                 {item.title || item.name}
               </h3>
 
+              {/* PHẦN ĐÁNH GIÁ (FAKE) */}
+              <div className="flex items-center gap-1 mb-2 text-[10px] md:text-xs">
+                <div className="flex text-yellow-400">
+                  <span className="font-bold mr-1 text-gray-700">
+                    {randomRating}
+                  </span>
+                  ★
+                </div>
+              </div>
+
               <div className="flex flex-col mb-3">
-                <div className="flex items-end gap-2">
-                  <span className="text-red-600 font-extrabold text-base md:text-lg leading-none">
-                    {Number(item.flash_sale_price).toLocaleString("vi-VN")}đ
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-gray-400 text-xs line-through decoration-gray-400">
+                    ₫{Number(item.price).toLocaleString("vi-VN")}
                   </span>
                 </div>
-                <span className="text-gray-400 text-[10px] md:text-xs line-through mt-1">
-                  Giá gốc: {Number(item.price).toLocaleString("vi-VN")}đ
-                </span>
+                <div className="flex flex-wrap items-end gap-1.5">
+                  <span className="text-[#ee4d2d] font-bold text-xl leading-none tracking-tight">
+                    <span className="text-sm">₫</span>
+                    {Number(item.flash_sale_price).toLocaleString("vi-VN")}
+                  </span>
+                  <span className="bg-[#ee4d2d] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-sm shadow-sm whitespace-nowrap mb-0.5 border border-[#ee4d2d]">
+                    FLASH SALE
+                  </span>
+                </div>
               </div>
 
               {/* Thanh trạng thái đã bán */}

@@ -18,15 +18,20 @@ export default function LiveChat() {
 
   // Hiệu ứng chạy chữ bong bóng
   useEffect(() => {
+    let timeout: NodeJS.Timeout;
+
     const interval = setInterval(() => {
       setIsBubbleVisible(false);
-      setTimeout(() => {
+      timeout = setTimeout(() => {
         setCurrentBubbleMsg((prev) => (prev + 1) % bubbleMessages.length);
         setIsBubbleVisible(true);
       }, 500);
     }, 4000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
   }, []);
 
   return (

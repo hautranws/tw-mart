@@ -107,64 +107,105 @@ export default function CategoryClient({
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {products.length > 0 ? (
-            products.map((product) => (
-              <Link
-                key={product.id}
-                href={`/product/${product.id}`}
-                className="block group"
-              >
-                <div className="bg-white p-4 rounded-lg shadow-sm hover:shadow-xl transition border border-gray-100 flex flex-col h-full relative group-hover:border-blue-200">
-                  {product.discount && (
-                    <span className="absolute top-2 left-2 bg-red-600 text-white text-[10px] px-2 py-1 rounded font-bold z-10 shadow-sm">
-                      {product.discount}
-                    </span>
-                  )}
-                  <div
-                    className={`h-40 ${product.image_url} rounded-lg mb-3 flex items-center justify-center text-gray-400 bg-opacity-10 group-hover:scale-105 transition duration-300`}
-                  >
-                    {/* CODE CŨ CỦA BẠN DÙNG image_url, NẾU DB LÀ img THÌ SẼ LỖI ẢNH, NHƯNG TÔI KHÔNG SỬA THEO YÊU CẦU */}
-                    {product.img ? (
-                      <img
-                        src={product.img}
-                        alt={product.title || product.name}
-                        className="h-full object-contain"
-                      />
-                    ) : (
-                      "[Ảnh]"
+            products.map((product) => {
+              const hash = String(product.id)
+                .split("")
+                .reduce((a, c) => a + c.charCodeAt(0), 0);
+              const discountPercent = 5 + (hash % 11);
+              const currentPrice = product.price || 0;
+              const voucherPrice =
+                Math.round(
+                  (currentPrice * (1 - discountPercent / 100)) / 1000,
+                ) * 1000;
+
+              return (
+                <Link
+                  key={product.id}
+                  href={`/product/${product.id}`}
+                  className="block group"
+                >
+                  <div className="bg-white p-4 rounded-lg shadow-sm hover:shadow-xl transition border border-gray-100 flex flex-col h-full relative group-hover:border-blue-200">
+                    {product.discount && (
+                      <span className="absolute top-2 left-2 bg-red-600 text-white text-[10px] px-2 py-1 rounded font-bold z-10 shadow-sm">
+                        {product.discount}
+                      </span>
                     )}
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-gray-800 text-sm line-clamp-2 mb-2 group-hover:text-blue-700 min-h-[40px] transition">
-                      {/* Thêm fallback product.title nếu product.name không có */}
-                      {product.name || product.title}
-                    </h3>
-                    <p className="text-blue-700 font-bold text-lg">
-                      {product.price?.toLocaleString("vi-VN")}đ
-                      {/* --- PHẦN MỚI THÊM: HIỂN THỊ ĐƠN VỊ TÍNH (STEP 3) --- */}
-                      {product.unit && (
-                        <span className="text-sm font-normal text-gray-500 ml-1">
-                          / {product.unit}
-                        </span>
+                    <div
+                      className={`h-40 ${product.image_url} rounded-lg mb-3 flex items-center justify-center text-gray-400 bg-opacity-10 group-hover:scale-105 transition duration-300`}
+                    >
+                      {/* CODE CŨ CỦA BẠN DÙNG image_url, NẾU DB LÀ img THÌ SẼ LỖI ẢNH, NHƯNG TÔI KHÔNG SỬA THEO YÊU CẦU */}
+                      {product.img ? (
+                        <img
+                          src={product.img}
+                          alt={product.title || product.name}
+                          className="h-full object-contain"
+                        />
+                      ) : (
+                        "[Ảnh]"
                       )}
-                    </p>
-                    {/* Hỗ trợ cả original_price và old_price để không bị lỗi */}
-                    {(product.original_price || product.old_price) && (
-                      <p className="text-gray-400 text-xs line-through">
-                        {(
-                          product.original_price || product.old_price
-                        ).toLocaleString("vi-VN")}
-                        đ
-                      </p>
-                    )}
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-gray-800 text-sm line-clamp-2 mb-2 group-hover:text-blue-700 min-h-[40px] transition">
+                        {/* Thêm fallback product.title nếu product.name không có */}
+                        {product.name || product.title}
+                      </h3>
+
+                      {/* PHẦN ĐÁNH GIÁ & LƯỢT BÁN (FAKE) */}
+                      <div className="flex items-center gap-2 mb-1 text-xs">
+                        <div className="flex text-yellow-400">
+                          <span className="font-bold mr-1 text-gray-700">
+                            {4 +
+                              (String(product.id)
+                                .split("")
+                                .reduce((a, c) => a + c.charCodeAt(0), 0) %
+                                10) /
+                                10}
+                          </span>
+                          ★
+                        </div>
+                        <span className="text-gray-400">|</span>
+                        <span className="text-gray-500">
+                          Đã bán{" "}
+                          {(String(product.id)
+                            .split("")
+                            .reduce((a, c) => a + c.charCodeAt(0), 0) %
+                            150) +
+                            120}
+                        </span>
+                      </div>
+
+                      {/* HIỂN THỊ GIÁ SAU VOUCHER (GIỐNG SHOPEE) */}
+                      <div className="flex flex-col mt-1 mb-2">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-gray-400 text-xs line-through decoration-gray-400">
+                            ₫{currentPrice.toLocaleString("vi-VN")}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-end gap-1.5">
+                          <span className="text-[#ee4d2d] font-bold text-lg leading-none tracking-tight">
+                            <span className="text-xs">₫</span>
+                            {voucherPrice.toLocaleString("vi-VN")}
+                          </span>
+                          <span className="bg-[#ee4d2d] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-sm shadow-sm whitespace-nowrap border border-[#ee4d2d]">
+                            DÙNG VOUCHER
+                          </span>
+                          {product.unit && (
+                            <span className="text-gray-500 text-[10px] ml-auto pb-[1px] truncate max-w-[50px]">
+                              / {product.unit}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <button className="w-full bg-white text-blue-600 border border-blue-600 font-bold py-2 rounded hover:bg-blue-600 hover:text-white transition text-xs uppercase">
+                        Xem chi tiết
+                      </button>
+                    </div>
                   </div>
-                  <div className="mt-4">
-                    <button className="w-full bg-white text-blue-600 border border-blue-600 font-bold py-2 rounded hover:bg-blue-600 hover:text-white transition text-xs uppercase">
-                      Xem chi tiết
-                    </button>
-                  </div>
-                </div>
-              </Link>
-            ))
+                </Link>
+              );
+            })
           ) : (
             <div className="col-span-4 py-20 text-center bg-white rounded-xl border border-dashed border-gray-300">
               <p className="text-gray-500 text-lg mb-4">

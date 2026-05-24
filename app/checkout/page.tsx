@@ -221,7 +221,7 @@ export default function CheckoutPage() {
         .eq("is_active", true)
         .or(`expiry_date.is.null,expiry_date.gt.${now}`)
         .order("min_order_value", { ascending: true })
-        .limit(5);
+        .limit(20);
 
       if (data)
         setAvailableCoupons(
@@ -239,31 +239,45 @@ export default function CheckoutPage() {
     if (currentCityName) {
       const lowerCity = currentCityName.toLowerCase();
       const today = new Date();
-      let minDays = 3,
-        maxDays = 5;
 
-      if (isHCMC) {
+      // Mặc định miền Trung và miền Bắc là 3-4 ngày
+      let minDays = 3,
+        maxDays = 4;
+
+      // Danh sách các tỉnh thành thuộc miền Nam
+      const southernProvinces = [
+        "hồ chí minh",
+        "hcm",
+        "sài gòn",
+        "bình phước",
+        "bình dương",
+        "đồng nai",
+        "tây ninh",
+        "bà rịa",
+        "vũng tàu",
+        "long an",
+        "đồng tháp",
+        "tiền giang",
+        "an giang",
+        "bến tre",
+        "vĩnh long",
+        "trà vinh",
+        "hậu giang",
+        "kiên giang",
+        "sóc trăng",
+        "bạc liêu",
+        "cà mau",
+        "cần thơ",
+      ];
+
+      const isSouth = southernProvinces.some((prov) =>
+        lowerCity.includes(prov),
+      );
+      if (isSouth) {
         minDays = 1;
         maxDays = 3;
-      } else if (
-        lowerCity.includes("long an") ||
-        lowerCity.includes("tiền giang") ||
-        lowerCity.includes("cần thơ") ||
-        lowerCity.includes("bình dương") ||
-        lowerCity.includes("đồng nai")
-      ) {
-        minDays = 2;
-        maxDays = 3;
-      } else if (lowerCity.includes("đà nẵng") || lowerCity.includes("huế")) {
-        minDays = 3;
-        maxDays = 4;
-      } else if (
-        lowerCity.includes("hà nội") ||
-        lowerCity.includes("hải phòng")
-      ) {
-        minDays = 3;
-        maxDays = 5;
       }
+
       const dateMin = new Date(today);
       dateMin.setDate(today.getDate() + minDays);
       const dateMax = new Date(today);
@@ -271,8 +285,10 @@ export default function CheckoutPage() {
       setShippingEstimate(
         `Nhận hàng từ: ${dateMin.getDate()}/${dateMin.getMonth() + 1} - ${dateMax.getDate()}/${dateMax.getMonth() + 1}`,
       );
+    } else {
+      setShippingEstimate("");
     }
-  }, [isHCMC, currentCityName]);
+  }, [currentCityName]);
 
   const handleAddressBookChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const id = e.target.value;
@@ -399,76 +415,36 @@ export default function CheckoutPage() {
   }, [availableCoupons, subTotal]);
 
   useEffect(() => {
-    let best = null;
-    let maxD = 0;
-    availableCoupons.forEach((c) => {
-      if (subTotal >= c.min_order_value) {
-        let d =
-          c.discount_type === "percent"
-            ? (subTotal * c.discount_value) / 100
-            : c.discount_value;
-        if (c.max_discount_amount > 0 && d > c.max_discount_amount)
-          d = c.max_discount_amount;
-        if (d > subTotal) d = subTotal;
-        if (d > maxD) {
-          maxD = d;
-          best = c;
-        }
-      }
-    });
-
-    let currentD = 0;
-    let currentValid = false;
     if (appliedCoupon) {
-      if (subTotal >= (appliedCoupon as any).min_order_value) {
-        currentValid = true;
-        currentD =
+      const minOrder = (appliedCoupon as any).min_order_value;
+      if (subTotal >= minOrder) {
+        let currentD =
           (appliedCoupon as any).discount_type === "percent"
             ? (subTotal * (appliedCoupon as any).discount_value) / 100
             : (appliedCoupon as any).discount_value;
         if (
           (appliedCoupon as any).max_discount_amount > 0 &&
           currentD > (appliedCoupon as any).max_discount_amount
-        )
+        ) {
           currentD = (appliedCoupon as any).max_discount_amount;
+        }
         if (currentD > subTotal) currentD = subTotal;
-      }
-    }
 
-    if (best && maxD > currentD) {
-      if (
-        (appliedCoupon as any)?.id !== (best as any).id ||
-        discountAmount !== maxD
-      ) {
-        setAppliedCoupon(best);
-        setCouponCode((best as any).code);
-        setDiscountAmount(maxD);
-        setCouponMessage({
-          type: "success",
-          text: `✅ Đã tự động áp dụng mã ưu đãi: -${maxD.toLocaleString("vi-VN")}đ`,
-        });
-      }
-    } else if (currentValid) {
-      if (discountAmount !== currentD) setDiscountAmount(currentD);
-    } else {
-      if (appliedCoupon !== null || discountAmount !== 0) {
+        if (discountAmount !== currentD) {
+          setDiscountAmount(currentD);
+        }
+      } else {
+        // Hủy mã nếu khách hàng bỏ bớt sản phẩm dẫn đến giỏ hàng không đủ điều kiện
         setAppliedCoupon(null);
         setDiscountAmount(0);
-        if (couponMessage.text !== "⚠️ Mã đã bị hủy do chưa đủ điều kiện!") {
-          setCouponMessage({
-            type: "error",
-            text: "⚠️ Mã đã bị hủy do chưa đủ điều kiện!",
-          });
-        }
+        setCouponCode("");
+        setCouponMessage({
+          type: "error",
+          text: `⚠️ Mã đã bị hủy vì đơn hàng chưa đủ ${minOrder.toLocaleString("vi-VN")}đ!`,
+        });
       }
     }
-  }, [
-    subTotal,
-    availableCoupons,
-    appliedCoupon,
-    discountAmount,
-    couponMessage.text,
-  ]);
+  }, [subTotal, appliedCoupon, discountAmount]);
 
   const handleOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -499,7 +475,7 @@ export default function CheckoutPage() {
 
     let deliveryNote = "";
     if (deliveryMethod === "home") {
-      deliveryNote = `Giao hàng bay Air: ${shippingEstimate}`;
+      deliveryNote = `Giao hàng tiêu chuẩn: ${shippingEstimate}`;
     }
 
     const orderInfo = {
@@ -594,7 +570,11 @@ export default function CheckoutPage() {
                         </p>
                       )}
                       <p className="text-red-600 font-black mb-2">
-                        {(item.selectedVariant ? Number(item.selectedVariant.price) : item.price).toLocaleString("vi-VN")}đ
+                        {(item.selectedVariant
+                          ? Number(item.selectedVariant.price)
+                          : item.price
+                        ).toLocaleString("vi-VN")}
+                        đ
                       </p>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm">
@@ -797,10 +777,10 @@ export default function CheckoutPage() {
 
                     <div className="pt-2">
                       <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 flex items-start gap-3">
-                        <span className="text-2xl mt-1 text-blue-600">✈️</span>
+                        <span className="text-2xl mt-1 text-blue-600">🚚</span>
                         <div>
                           <p className="text-sm font-bold text-blue-900">
-                            Giao hàng đường bay (Air)
+                            Giao hàng tận nơi
                           </p>
                           <p className="text-xs text-blue-700 font-medium mt-1">
                             {shippingEstimate ||
@@ -928,77 +908,86 @@ export default function CheckoutPage() {
                         <span>🎁</span> Mã TWMED dành cho bạn:
                       </p>
                       <div className="space-y-3">
-                        {availableCoupons.map((c) => {
-                          const isBest = c.id === bestCouponId;
-                          const isApplied = (appliedCoupon as any)?.id === c.id;
+                        {[...availableCoupons]
+                          .sort((a, b) =>
+                            a.id === bestCouponId
+                              ? -1
+                              : b.id === bestCouponId
+                                ? 1
+                                : 0,
+                          )
+                          .map((c) => {
+                            const isBest = c.id === bestCouponId;
+                            const isApplied =
+                              (appliedCoupon as any)?.id === c.id;
 
-                          return (
-                            <div
-                              key={c.id}
-                              className={`flex flex-col p-3.5 rounded-xl border-2 transition-all ${isApplied ? "border-red-500 bg-white shadow-md" : "bg-white border-transparent shadow-sm hover:border-red-200"}`}
-                            >
-                              <div className="flex justify-between items-start mb-2">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-black text-red-700 text-lg tracking-wider">
-                                    {c.code}
-                                  </span>
-                                  {isBest && (
-                                    <span className="bg-yellow-400 text-red-800 text-[10px] font-black px-2 py-0.5 rounded-sm uppercase shadow-sm">
-                                      🔥 Ngon nhất
+                            return (
+                              <div
+                                key={c.id}
+                                className={`flex flex-col p-3.5 rounded-xl border-2 transition-all ${isApplied ? "border-red-500 bg-white shadow-md" : "bg-white border-transparent shadow-sm hover:border-red-200"}`}
+                              >
+                                <div className="flex justify-between items-start mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-black text-red-700 text-lg tracking-wider">
+                                      {c.code}
                                     </span>
-                                  )}
+                                    {isBest && (
+                                      <span className="bg-yellow-400 text-red-800 text-[10px] font-black px-2 py-0.5 rounded-sm uppercase shadow-sm">
+                                        🔥 Tốt nhất
+                                      </span>
+                                    )}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => checkCoupon(c.code)}
+                                    className={`font-bold text-xs px-4 py-2 rounded-lg transition-all ${isApplied ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-red-50 text-red-600 hover:bg-red-600 hover:text-white"}`}
+                                    disabled={isApplied}
+                                  >
+                                    {isApplied ? "Đang áp dụng" : "Dùng mã"}
+                                  </button>
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() => checkCoupon(c.code)}
-                                  className={`font-bold text-xs px-4 py-2 rounded-lg transition-all ${isApplied ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-red-50 text-red-600 hover:bg-red-600 hover:text-white"}`}
-                                  disabled={isApplied}
-                                >
-                                  {isApplied ? "Đang áp dụng" : "Dùng mã"}
-                                </button>
-                              </div>
-                              <div className="text-gray-600 text-xs space-y-1.5">
-                                <p>
-                                  <span className="font-bold text-gray-800">
-                                    Giảm{" "}
-                                    {c.discount_type === "percent"
-                                      ? `${c.discount_value}%`
-                                      : `${c.discount_value.toLocaleString("vi-VN")}đ`}
-                                  </span>
-                                  {c.max_discount_amount > 0 && (
-                                    <span>
-                                      {" "}
-                                      (Tối đa{" "}
-                                      {c.max_discount_amount.toLocaleString(
-                                        "vi-VN",
-                                      )}
-                                      đ)
+                                <div className="text-gray-600 text-xs space-y-1.5">
+                                  <p>
+                                    <span className="font-bold text-gray-800">
+                                      Giảm{" "}
+                                      {c.discount_type === "percent"
+                                        ? `${c.discount_value}%`
+                                        : `${c.discount_value.toLocaleString("vi-VN")}đ`}
                                     </span>
-                                  )}
-                                </p>
-                                <p className="text-gray-500">
-                                  Áp dụng cho đơn từ{" "}
-                                  {c.min_order_value.toLocaleString("vi-VN")}đ
-                                </p>
-                              </div>
-
-                              {subTotal < c.min_order_value && (
-                                <div className="mt-3 pt-3 border-t border-gray-50">
-                                  <p className="text-red-500 text-[11px] font-bold flex items-center gap-1.5">
-                                    <span className="bg-red-100 rounded-full w-4 h-4 flex items-center justify-center">
-                                      !
-                                    </span>{" "}
-                                    Mua thêm{" "}
-                                    {(
-                                      c.min_order_value - subTotal
-                                    ).toLocaleString("vi-VN")}
-                                    đ để đủ điều kiện
+                                    {c.max_discount_amount > 0 && (
+                                      <span>
+                                        {" "}
+                                        (Tối đa{" "}
+                                        {c.max_discount_amount.toLocaleString(
+                                          "vi-VN",
+                                        )}
+                                        đ)
+                                      </span>
+                                    )}
+                                  </p>
+                                  <p className="text-gray-500">
+                                    Áp dụng cho đơn từ{" "}
+                                    {c.min_order_value.toLocaleString("vi-VN")}đ
                                   </p>
                                 </div>
-                              )}
-                            </div>
-                          );
-                        })}
+
+                                {subTotal < c.min_order_value && (
+                                  <div className="mt-3 pt-3 border-t border-gray-50">
+                                    <p className="text-red-500 text-[11px] font-bold flex items-center gap-1.5">
+                                      <span className="bg-red-100 rounded-full w-4 h-4 flex items-center justify-center">
+                                        !
+                                      </span>{" "}
+                                      Mua thêm{" "}
+                                      {(
+                                        c.min_order_value - subTotal
+                                      ).toLocaleString("vi-VN")}
+                                      đ để đủ điều kiện
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                       </div>
                     </div>
                   )}
@@ -1021,8 +1010,8 @@ export default function CheckoutPage() {
                   </div>
                   {deliveryMethod === "home" && subTotal < 50000 && (
                     <p className="text-[11px] text-orange-500 italic text-right font-medium">
-                      Mua thêm {(50000 - subTotal).toLocaleString("vi-VN")}đ để
-                      được Freeship
+                      Bạn còn thiếu {(50000 - subTotal).toLocaleString("vi-VN")}
+                      đ để được Freeship!
                     </p>
                   )}
 

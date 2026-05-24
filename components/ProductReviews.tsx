@@ -27,7 +27,16 @@ const reviews = [
   },
 ];
 
-export default function ProductReviews() {
+export default function ProductReviews({
+  productId = "default",
+}: {
+  productId?: string | number;
+}) {
+  const idString = String(productId);
+  const hash = idString.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  const rating = 4 + (hash % 10) / 10;
+  const reviewCount = (hash % 150) + 120;
+
   return (
     <div className="mt-8 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
       <h2 className="text-xl font-bold text-gray-800 mb-6 border-l-4 border-blue-600 pl-3">
@@ -38,10 +47,11 @@ export default function ProductReviews() {
         {/* CỘT TRÁI: TỔNG QUAN ĐIỂM SỐ */}
         <div className="md:w-1/3 flex flex-col items-center justify-center border-r border-gray-100 pr-4">
           <div className="text-5xl font-bold text-blue-600 mb-2">
-            4.8<span className="text-2xl text-gray-400">/5</span>
+            {rating}
+            <span className="text-2xl text-gray-400">/5</span>
           </div>
           <div className="flex text-yellow-400 text-xl mb-2">★★★★★</div>
-          <p className="text-gray-500 text-sm">(128 đánh giá)</p>
+          <p className="text-gray-500 text-sm">({reviewCount} đánh giá)</p>
 
           {/* Thanh tỉ lệ sao */}
           <div className="w-full mt-4 space-y-2">
@@ -102,7 +112,7 @@ export default function ProductReviews() {
           {/* Nút xem thêm */}
           <div className="text-center mt-6">
             <button className="text-blue-600 border border-blue-600 px-6 py-2 rounded-full text-sm font-bold hover:bg-blue-50 transition">
-              Xem tất cả 128 đánh giá
+              Xem tất cả {reviewCount} đánh giá
             </button>
           </div>
         </div>

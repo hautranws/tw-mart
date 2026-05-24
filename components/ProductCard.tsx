@@ -30,7 +30,7 @@ const ProductCard: React.FC<ProductProps> = ({ product }) => {
   } catch {}
 
   const [selectedVariant, setSelectedVariant] = useState<any>(
-    hasVariants ? variantsList[0] : null
+    hasVariants ? variantsList[0] : null,
   );
 
   const getThumbnail = (imgData: string) => {
@@ -57,6 +57,16 @@ const ProductCard: React.FC<ProductProps> = ({ product }) => {
     addToCart(product, selectedVariant);
   };
 
+  // MÔ PHỎNG GIÁ SAU MÃ GIẢM GIÁ (Tạo sức hút như Shopee)
+  const hash = String(product.id)
+    .split("")
+    .reduce((a, c) => a + c.charCodeAt(0), 0);
+  const discountPercent = 5 + (hash % 11); // Giảm ngẫu nhiên 5% - 15%
+  const randomSold = (hash % 120) + 40; // Ngẫu nhiên từ 40 - 159 sản phẩm (cố định theo id)
+  const rating = 4 + (hash % 10) / 10; // Ngẫu nhiên sao từ 4.0 - 4.9
+  const voucherPrice =
+    Math.round((currentPrice * (1 - discountPercent / 100)) / 1000) * 1000;
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-shadow duration-300 p-4 flex flex-col h-full relative group">
       {/* Link đã chốt chuẩn là /product/ */}
@@ -79,15 +89,37 @@ const ProductCard: React.FC<ProductProps> = ({ product }) => {
         </h3>
       </Link>
 
-      <div className="flex items-end gap-1 mb-2">
-        <span className="text-blue-600 font-bold text-lg">
-          {currentPrice.toLocaleString("vi-VN")}đ
-        </span>
-        {product.unit && !hasVariants && (
-          <span className="text-gray-500 text-sm mb-[2px]">
-            / {product.unit}
+      {/* HIỂN THỊ GIÁ NHƯ SHOPEE: GIÁ GỐC BỊ GẠCH ĐI & GIÁ SAU MÃ NỔI BẬT */}
+      <div className="flex flex-col mb-2">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-gray-400 text-xs line-through decoration-gray-400">
+            ₫{currentPrice.toLocaleString("vi-VN")}
           </span>
-        )}
+        </div>
+        <div className="flex flex-wrap items-end gap-1.5">
+          <span className="text-[#ee4d2d] font-bold text-xl leading-none tracking-tight">
+            <span className="text-sm">₫</span>
+            {voucherPrice.toLocaleString("vi-VN")}
+          </span>
+          <span className="bg-[#ee4d2d] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-sm shadow-sm whitespace-nowrap mb-0.5 border border-[#ee4d2d]">
+            DÙNG VOUCHER
+          </span>
+          {product.unit && !hasVariants && (
+            <span className="text-gray-500 text-[10px] ml-auto pb-0.5 truncate max-w-[50px]">
+              / {product.unit}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* [MỚI] HIỂN THỊ LƯỢT BÁN & ĐÁNH GIÁ (FAKE) */}
+      <div className="flex items-center gap-1 text-[11px] text-gray-500 mb-3">
+        <div className="flex text-yellow-400">
+          <span className="font-bold mr-1 text-gray-700">{rating}</span>★
+        </div>
+        <span className="px-2 border-l border-gray-300 ml-1">
+          Đã bán {randomSold}
+        </span>
       </div>
 
       <div className="mb-4 flex-1">

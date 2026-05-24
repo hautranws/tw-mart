@@ -23,24 +23,26 @@ export default function ZaloChat() {
     // Nếu đang di chuột vào thì không đổi câu
     if (isHovered || !showBubble) return;
 
+    let hideTimer: NodeJS.Timeout;
+    let showTimer: NodeJS.Timeout;
+
     const interval = setInterval(() => {
       // Ẩn đi một chút trước khi đổi câu
-      const hideTimer = setTimeout(() => {
+      hideTimer = setTimeout(() => {
         setCurrentMessageIndex((prev) => (prev + 1) % messages.length);
       }, 300); // Đợi hiệu ứng mờ dần
 
       // Hiện lại sau khi đã đổi text
-      const showTimer = setTimeout(() => {
+      showTimer = setTimeout(() => {
         // Chỉ là trigger để React render lại, hiệu ứng CSS sẽ lo phần chuyển đổi
       }, 300 + 100);
-
-      return () => {
-        clearTimeout(hideTimer);
-        clearTimeout(showTimer);
-      };
     }, 4000); // 4 giây đổi câu 1 lần
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(hideTimer);
+      clearTimeout(showTimer);
+    };
   }, [isHovered, showBubble]);
 
   return (

@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     // Truy vấn DB để lấy giá gốc và giá biến thể chính xác
     const { data: productsData, error: productsError } = await supabaseAdmin
       .from("products_tw")
-      .select("id, price, variants")
+      .select("id, price, variants, category_id")
       .in("id", productIds);
 
     if (productsError) throw productsError;
@@ -96,34 +96,101 @@ export async function POST(req: Request) {
           coupon.usage_limit > 0 && coupon.used_count >= coupon.usage_limit;
         const isMinOrderMet = serverSubTotal >= (coupon.min_order_value || 0);
 
-        if (
-          coupon.is_active &&
-          !isExpired &&
-          !isLimitReached &&
-          isMinOrderMet
-        ) {
-          if (coupon.discount_type === "percent") {
-            discountAmount = (serverSubTotal * coupon.discount_value) / 100;
-            // Kiểm tra giới hạn giảm tối đa
-            if (
-              coupon.max_discount_amount > 0 &&
-              discountAmount > coupon.max_discount_amount
-            ) {
-              discountAmount = coupon.max_discount_amount;
-            }
-          } else {
-            discountAmount = coupon.discount_value;
-          }
-          if (discountAmount > serverSubTotal) discountAmount = serverSubTotal;
-          finalAmount = serverSubTotal - discountAmount;
-          appliedCouponCode = coupon.code;
-
-          // 👈 CẬP NHẬT SỐ LƯỢNG MÃ ĐÃ DÙNG VÀO BẢNG coupons_tw
-          await supabaseAdmin
-            .from("coupons_tw")
-            .update({ used_count: coupon.used_count + 1 })
-            .eq("id", coupon.id);
+        // Báo lỗi cụ thể nếu mã không dùng được
+        if (!coupon.is_active) {
+          return NextResponse.json(
+            { error: "Mã khuyến mãi đã bị khóa!" },
+            { status: 400 },
+          );
         }
+        if (isExpired) {
+          return NextResponse.json(
+            { error: "Mã khuyến mãi đã hết hạn!" },
+            { status: 400 },
+          );
+        }
+        if (isLimitReached) {
+          return NextResponse.json(
+            { error: "Mã khuyến mãi đã hết lượt sử dụng!" },
+            { status: 400 },
+          );
+        }
+        if (!isMinOrderMet) {
+          return NextResponse.json(
+            {
+              error: `Đơn hàng chưa đạt tối thiểu ${coupon.min_order_value.toLocaleString()}đ để dùng mã này!`,
+            },
+            { status: 400 },
+          );
+        }
+
+        // TÍNH TOÁN TIỀN CHỈ TỪ CÁC SẢN PHẨM HỢP LỆ (Dựa theo Scope)
+        let applicableSubTotal = 0;
+        items.forEach((item: any) => {
+          let price = priceMap.get(`product-${item.id}`) || 0;
+          if (item.selectedVariant && item.selectedVariant.name) {
+            price =
+              priceMap.get(`variant-${item.id}-${item.selectedVariant.name}`) ||
+              price;
+          }
+
+          const productInfo = productsData.find((p: any) => p.id === item.id);
+          const categoryId = productInfo?.category_id || "";
+
+          let isApplicable = true;
+          if (coupon.scope === "include_category") {
+            isApplicable = coupon.applied_items.includes(categoryId);
+          } else if (coupon.scope === "exclude_category") {
+            isApplicable = !coupon.applied_items.includes(categoryId);
+          } else if (coupon.scope === "include_product") {
+            isApplicable = coupon.applied_items.some(
+              (id: any) => String(id) === String(item.id),
+            );
+          } else if (coupon.scope === "exclude_product") {
+            isApplicable = !coupon.applied_items.some(
+              (id: any) => String(id) === String(item.id),
+            );
+          }
+
+          if (isApplicable) applicableSubTotal += price * item.quantity;
+        });
+
+        if (applicableSubTotal <= 0 && coupon.scope !== "all") {
+          return NextResponse.json(
+            {
+              error:
+                "Mã khuyến mãi không áp dụng cho các sản phẩm có trong giỏ hàng!",
+            },
+            { status: 400 },
+          );
+        }
+
+        if (coupon.discount_type === "percent") {
+          discountAmount = (applicableSubTotal * coupon.discount_value) / 100;
+          if (
+            coupon.max_discount_amount > 0 &&
+            discountAmount > coupon.max_discount_amount
+          ) {
+            discountAmount = coupon.max_discount_amount;
+          }
+        } else {
+          discountAmount = coupon.discount_value;
+          if (discountAmount > applicableSubTotal)
+            discountAmount = applicableSubTotal;
+        }
+
+        finalAmount = serverSubTotal - discountAmount;
+        appliedCouponCode = coupon.code;
+
+        await supabaseAdmin
+          .from("coupons_tw")
+          .update({ used_count: coupon.used_count + 1 })
+          .eq("id", coupon.id);
+      } else {
+        return NextResponse.json(
+          { error: "Mã khuyến mãi không tồn tại!" },
+          { status: 400 },
+        );
       }
     }
 
@@ -171,6 +238,13 @@ export async function POST(req: Request) {
     }
 
     // --- BƯỚC 2: TẠO ĐƠN HÀNG VÀO BẢNG orders_tw ---
+    // Chèn mã giảm giá vào Note vì bảng đơn hàng hiện tại có thể không có cột coupon_code
+    const finalNote =
+      note +
+      (appliedCouponCode
+        ? `\n\n[Hệ thống]: Đã áp mã ${appliedCouponCode}, giảm ${discountAmount.toLocaleString()}đ.`
+        : "");
+
     const { data: orderData, error: orderError } = await supabaseAdmin
       .from("orders_tw")
       .insert([
@@ -182,7 +256,7 @@ export async function POST(req: Request) {
           total_amount: finalAmount,
           items: items,
           status: "đang xử lý",
-          note: note,
+          note: finalNote,
         },
       ])
       .select()
